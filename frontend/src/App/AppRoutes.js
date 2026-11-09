@@ -4,6 +4,7 @@ import { Redirect, Route } from 'react-router-dom';
 import BlocklistConnector from 'Activity/Blocklist/BlocklistConnector';
 import HistoryConnector from 'Activity/History/HistoryConnector';
 import QueueConnector from 'Activity/Queue/QueueConnector';
+import SinglesReview from 'Activity/Singles/SinglesReview';
 import AlbumDetailsPageConnector from 'Album/Details/AlbumDetailsPageConnector';
 import ArtistDetailsPageConnector from 'Artist/Details/ArtistDetailsPageConnector';
 import ArtistIndex from 'Artist/Index/ArtistIndex';
@@ -13,6 +14,7 @@ import Switch from 'Components/Router/Switch';
 import AddNewItemConnector from 'Search/AddNewItemConnector';
 import CustomFormatSettingsPage from 'Settings/CustomFormats/CustomFormatSettingsPage';
 import DownloadClientSettingsConnector from 'Settings/DownloadClients/DownloadClientSettingsConnector';
+import FeatureSettings from 'Settings/FeatureSettings';
 import GeneralSettingsConnector from 'Settings/General/GeneralSettingsConnector';
 import ImportListSettingsConnector from 'Settings/ImportLists/ImportListSettingsConnector';
 import IndexerSettingsConnector from 'Settings/Indexers/IndexerSettingsConnector';
@@ -138,6 +140,10 @@ function AppRoutes(props) {
         path="/activity/queue"
         component={QueueConnector}
       />
+
+      <Route path="/activity/singles" component={SinglesReview} />
+      <Route path="/settings/identification" render={() => <FeatureSettings feature="identification" />} />
+      <Route path="/settings/uniquesingles" render={() => <FeatureSettings feature="uniquesingles" />} />
 
       <Route
         path="/activity/blocklist"

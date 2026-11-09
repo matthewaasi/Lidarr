@@ -49,6 +49,7 @@ class InteractiveImportRow extends Component {
       album,
       tracks,
       quality,
+      aiMatch,
       size
     } = this.props;
 
@@ -57,7 +58,8 @@ class InteractiveImportRow extends Component {
       album != null &&
       tracks.length &&
       quality &&
-      size > 0
+      size > 0 &&
+      (!aiMatch || (aiMatch.accepted && !aiMatch.isError))
     ) {
       this.props.onSelectedChange({ id, value: true });
     }
@@ -187,6 +189,7 @@ class InteractiveImportRow extends Component {
       customFormats,
       indexerFlags,
       rejections,
+      aiMatch,
       columns,
       isReprocessing,
       audioTags,
@@ -366,7 +369,7 @@ class InteractiveImportRow extends Component {
 
         <TableRowCell>
           {
-            rejections.length ?
+            rejections.length || aiMatch ?
               <Popover
                 anchor={
                   <Icon
@@ -374,9 +377,18 @@ class InteractiveImportRow extends Component {
                     kind={kinds.DANGER}
                   />
                 }
-                title={translate('ReleaseRejected')}
+                title={aiMatch ? 'AI matching review' : translate('ReleaseRejected')}
                 body={
                   <ul>
+                    {aiMatch ? (
+                      <li>
+                        {aiMatch.isCached ? <div>{translate('SavedAiMatchingResult')}</div> : null}
+                        <div>{aiMatch.reason}</div>
+                        {aiMatch.model ? <div>Model: {aiMatch.model}</div> : null}
+                        {aiMatch.proposed ? <div>AI confidence: {Math.round(aiMatch.confidence * 100)}%</div> : null}
+                        {(aiMatch.candidates || []).map((candidate) => <div key={candidate}>{candidate}</div>)}
+                      </li>
+                    ) : null}
                     {
                       rejections.map((rejection, index) => {
                         return (
@@ -464,6 +476,7 @@ InteractiveImportRow.propTypes = {
   customFormats: PropTypes.arrayOf(PropTypes.object),
   indexerFlags: PropTypes.number.isRequired,
   rejections: PropTypes.arrayOf(PropTypes.object).isRequired,
+  aiMatch: PropTypes.object,
   columns: PropTypes.arrayOf(PropTypes.object).isRequired,
   audioTags: PropTypes.object.isRequired,
   additionalFile: PropTypes.bool.isRequired,

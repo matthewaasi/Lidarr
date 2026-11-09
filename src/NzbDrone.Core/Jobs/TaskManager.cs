@@ -17,6 +17,7 @@ using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music.Commands;
+using NzbDrone.Core.Music.Singles;
 using NzbDrone.Core.Update.Commands;
 
 namespace NzbDrone.Core.Jobs
@@ -135,6 +136,7 @@ namespace NzbDrone.Core.Jobs
                 };
 
             var currentTasks = _scheduledTaskRepository.All().ToList();
+            defaultTasks.Add(new ScheduledTask { Interval = 24 * 60, TypeName = typeof(ScanUniqueSinglesCommand).FullName });
 
             _logger.Trace("Initializing jobs. Available: {0} Existing: {1}", defaultTasks.Count, currentTasks.Count);
 

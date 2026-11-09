@@ -5,6 +5,7 @@ import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
+import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import MonitorToggleButton from 'Components/MonitorToggleButton';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
@@ -198,6 +199,10 @@ class ArtistDetailsSeason extends Component {
       sortDirection,
       onSortPress,
       isSmallScreen,
+      searchAlbumIds,
+      isSearching,
+      searchError,
+      onSearchPress,
       onTableOptionChange
     } = this.props;
 
@@ -215,6 +220,13 @@ class ArtistDetailsSeason extends Component {
       isOrganizeModalOpen,
       isManageTracksOpen
     } = this.state;
+
+    let searchTitle = translate('SearchMonitoredReleaseType', { count: searchAlbumIds.length, releaseType: label });
+    if (isSearching) {
+      searchTitle = translate('SearchingMonitoredReleaseType', { releaseType: label });
+    } else if (!searchAlbumIds.length) {
+      searchTitle = translate('NoMonitoredReleasesInGroup');
+    }
 
     return (
       <div
@@ -285,7 +297,25 @@ class ArtistDetailsSeason extends Component {
             }
           </Link>
 
+          <div className={styles.actions}>
+            <SpinnerIconButton
+              className={styles.searchButton}
+              name={icons.SEARCH}
+              size={20}
+              title={searchTitle}
+              aria-label={searchTitle}
+              isSpinning={isSearching}
+              isDisabled={!searchAlbumIds.length || isSearching}
+              onPress={onSearchPress}
+            />
+          </div>
         </div>
+
+        {searchError ? (
+          <div className={styles.searchError} role="alert">
+            {translate('ReleaseTypeSearchFailed')}
+          </div>
+        ) : null}
 
         <div>
           {
@@ -361,6 +391,10 @@ ArtistDetailsSeason.propTypes = {
   isSaving: PropTypes.bool,
   isExpanded: PropTypes.bool,
   isSmallScreen: PropTypes.bool.isRequired,
+  searchAlbumIds: PropTypes.arrayOf(PropTypes.number).isRequired,
+  isSearching: PropTypes.bool.isRequired,
+  searchError: PropTypes.bool.isRequired,
+  onSearchPress: PropTypes.func.isRequired,
   onTableOptionChange: PropTypes.func.isRequired,
   onExpandPress: PropTypes.func.isRequired,
   onSortPress: PropTypes.func.isRequired,

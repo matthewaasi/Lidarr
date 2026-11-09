@@ -32,6 +32,7 @@ namespace NzbDrone.Core.Parser.Model
 
         public TrackMapping TrackMapping { get; set; }
         public Distance Distance { get; set; }
+        public AiMatchResult AiMatch { get; set; }
         public AlbumRelease AlbumRelease { get; set; }
         public List<LocalTrack> ExistingTracks { get; set; }
         public bool NewDownload { get; set; }

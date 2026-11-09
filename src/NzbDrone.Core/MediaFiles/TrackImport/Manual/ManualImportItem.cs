@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine;
+using NzbDrone.Core.MediaFiles.TrackImport.Identification;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
@@ -29,6 +30,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
         public List<CustomFormat> CustomFormats { get; set; }
         public int IndexerFlags { get; set; }
         public IEnumerable<Rejection> Rejections { get; set; }
+        public AiMatchResult AiMatch { get; set; }
         public ParsedTrackInfo Tags { get; set; }
         public bool AdditionalFile { get; set; }
         public bool ReplaceExistingFiles { get; set; }

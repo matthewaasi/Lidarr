@@ -25,6 +25,7 @@ namespace NzbDrone.Core.Parser.Model
         public AlbumRelease Release { get; set; }
         public List<Track> Tracks { get; set; }
         public Distance Distance { get; set; }
+        public AiMatchResult AiMatch { get; set; }
         public QualityModel Quality { get; set; }
         public IndexerFlags IndexerFlags { get; set; }
         public bool ExistingFile { get; set; }

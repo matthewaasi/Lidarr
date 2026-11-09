@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
@@ -6,6 +7,7 @@ using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.History;
@@ -13,6 +15,7 @@ using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.TrackImport;
 using NzbDrone.Core.MediaFiles.TrackImport.Aggregation;
 using NzbDrone.Core.MediaFiles.TrackImport.Identification;
+using NzbDrone.Core.MediaFiles.TrackImport.Specifications;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.Qualities;
@@ -393,6 +396,76 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport
 
             decisions.Should().HaveCount(3);
             decisions.First().Rejections.Should().NotBeEmpty();
+        }
+
+        [TestCase(1, true)]
+        [TestCase(2, false)]
+        public void new_two_track_release_must_reject_all_files_when_a_track_is_missing(int count, bool missing)
+        {
+            GivenAudioFiles(Enumerable.Range(1, count).Select(i => $@"C:\Test\single\track{i}.flac".AsOsAgnostic()));
+            _idConfig.NewDownload = true;
+            GivenSpecifications(_pass1);
+            Mocker.SetConstant<IEnumerable<IImportDecisionEngineSpecification<LocalAlbumRelease>>>(new[] { new NoMissingOrUnmatchedTracksSpecification(TestLogger) });
+            var expected = new List<Track> { new Track { Id = 1, Title = "Main track" }, new Track { Id = 2, Title = "B-side" } };
+            Mocker.GetMock<IIdentificationService>()
+                .Setup(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()))
+                .Returns((List<LocalTrack> files, IdentificationOverrides overrides, ImportDecisionMakerConfig config) =>
+                {
+                    var mapping = new TrackMapping { MBExtra = expected.Skip(count).ToList(), LocalExtra = new List<LocalTrack>() };
+                    for (var i = 0; i < files.Count; i++)
+                    {
+                        files[i].Artist = _artist;
+                        files[i].Album = _album;
+                        files[i].Release = _albumRelease;
+                        files[i].Tracks = new List<Track> { expected[i] };
+                        files[i].AiMatch = new AiMatchResult { Accepted = true, Proposed = true, Status = "match" };
+                        mapping.Mapping.Add(files[i], Tuple.Create(expected[i], new Distance()));
+                    }
+
+                    return new List<LocalAlbumRelease>
+                    {
+                        new LocalAlbumRelease(files) { AlbumRelease = _albumRelease, AiMatch = new AiMatchResult { Accepted = true }, TrackMapping = mapping }
+                    };
+                });
+
+            var results = Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+
+            Assert.That(results.All(r => r.Approved), Is.EqualTo(!missing));
+            Assert.That(results.All(r => r.Item.AiMatch.IsError), Is.EqualTo(missing));
+            if (missing)
+            {
+                Assert.That(results.Single().Rejections.Single().Reason, Does.Contain("1 of 2"));
+                Assert.That(results.Single().Rejections.Single().Reason, Does.Contain("B-side"));
+            }
+        }
+
+        [Test]
+        public void cached_manual_preview_must_not_run_identification_or_overwrite_the_cache()
+        {
+            GivenAudioFiles(new[] { @"C:\Test\preview.flac".AsOsAgnostic() });
+            _idConfig.UseCachedIdentificationOnly = true;
+            Mocker.GetMock<IAiImportDecisionCache>()
+                .Setup(c => c.Read(It.IsAny<List<LocalTrack>>()))
+                .Returns((List<LocalTrack> files) => files.Select(f => new ImportDecision<LocalTrack>(f, new Rejection("Saved proposal"))).ToList());
+
+            var decisions = Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+
+            decisions.Should().HaveCount(1);
+            decisions[0].Rejections[0].Reason.Should().Be("Saved proposal");
+            Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Never());
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Save(It.IsAny<List<ImportDecision<LocalTrack>>>()), Times.Never());
+        }
+
+        [Test]
+        public void original_manual_preview_must_not_reuse_cached_ai_proposals()
+        {
+            GivenAudioFiles(new[] { @"C:\Test\preview.flac".AsOsAgnostic() });
+            _idConfig.UseCachedIdentificationOnly = true;
+            Mocker.GetMock<IConfigService>().SetupGet(c => c.MatchingEngine).Returns("Original");
+            Mocker.GetMock<IIdentificationService>().Setup(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>())).Returns(new List<LocalAlbumRelease>());
+            Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Read(It.IsAny<List<LocalTrack>>()), Times.Never());
+            Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Once());
         }
 
         [Test]

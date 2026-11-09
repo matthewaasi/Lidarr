@@ -29,6 +29,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
         private readonly IAugmentingService _augmentingService;
         private readonly ICandidateService _candidateService;
         private readonly IConfigService _configService;
+        private readonly ILmStudioMatcher _lmStudioMatcher;
         private readonly Logger _logger;
 
         public IdentificationService(ITrackService trackService,
@@ -38,6 +39,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                                      IAugmentingService augmentingService,
                                      ICandidateService candidateService,
                                      IConfigService configService,
+                                     ILmStudioMatcher lmStudioMatcher,
                                      Logger logger)
         {
             _trackService = trackService;
@@ -47,6 +49,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             _augmentingService = augmentingService;
             _candidateService = candidateService;
             _configService = configService;
+            _lmStudioMatcher = lmStudioMatcher;
             _logger = logger;
         }
 
@@ -194,6 +197,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
         private void IdentifyRelease(LocalAlbumRelease localAlbumRelease, IdentificationOverrides idOverrides, ImportDecisionMakerConfig config)
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
+            localAlbumRelease.AiMatch = null;
+            localAlbumRelease.LocalTracks.ForEach(t => t.AiMatch = null);
             var fingerprinted = false;
 
             var candidateReleases = _candidateService.GetDbCandidatesFromTags(localAlbumRelease, idOverrides, config.IncludeExisting);
@@ -219,6 +224,11 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             if (candidateReleases.Count == 0)
             {
+                if (_configService.MatchingEngine != "Original")
+                {
+                    _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, new List<LocalTrack>());
+                }
+
                 // can't find any candidates even after fingerprinting
                 // populate the overrides and return
                 foreach (var localTrack in localAlbumRelease.LocalTracks)
@@ -243,43 +253,33 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             _logger.Debug($"Retrieved {allLocalTracks.Count} possible tracks in {watch.ElapsedMilliseconds}ms");
 
-            GetBestRelease(localAlbumRelease, candidateReleases, allLocalTracks);
+            if (_configService.MatchingEngine != "Original")
+            {
+                _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, allLocalTracks);
+                return;
+            }
 
-            // If result isn't great and we haven't fingerprinted, try that
-            // Note that this can improve the match even if we try the same candidates
+            GetBestRelease(localAlbumRelease, candidateReleases, allLocalTracks);
             if (!fingerprinted && FingerprintingAllowed(config.NewDownload) && ShouldFingerprint(localAlbumRelease))
             {
-                _logger.Debug($"Match not good enough, fingerprinting");
                 _fingerprintingService.Lookup(localAlbumRelease.LocalTracks, 0.5);
-
-                // Only include extra possible candidates if neither album nor release are specified
-                // Will generally be specified as part of manual import
                 if (idOverrides?.Album == null && idOverrides?.AlbumRelease == null)
                 {
                     var dbCandidates = _candidateService.GetDbCandidatesFromFingerprint(localAlbumRelease, idOverrides, config.IncludeExisting);
                     var remoteCandidates = config.AddNewArtists ? _candidateService.GetRemoteCandidates(localAlbumRelease) : new List<CandidateAlbumRelease>();
-                    var extraCandidates = dbCandidates.Concat(remoteCandidates);
-                    var newCandidates = extraCandidates.ExceptBy(x => x.AlbumRelease.Id, candidateReleases, y => y.AlbumRelease.Id, EqualityComparer<int>.Default);
+                    var newCandidates = dbCandidates.Concat(remoteCandidates).ExceptBy(x => x.AlbumRelease.Id, candidateReleases, y => y.AlbumRelease.Id, EqualityComparer<int>.Default).ToList();
                     candidateReleases.AddRange(newCandidates);
-
                     PopulateTracks(candidateReleases);
-
-                    allLocalTracks.AddRange(ToLocalTrack(newCandidates
-                                                         .SelectMany(x => x.ExistingTracks)
-                                                         .DistinctBy(x => x.Path)
-                                                         .ExceptBy(x => x.Path, allLocalTracks, x => x.Path, PathEqualityComparer.Instance),
-                                                         localAlbumRelease));
+                    allLocalTracks.AddRange(ToLocalTrack(newCandidates.SelectMany(x => x.ExistingTracks).DistinctBy(x => x.Path).ExceptBy(x => x.Path, allLocalTracks, x => x.Path, PathEqualityComparer.Instance), localAlbumRelease));
                 }
 
-                // fingerprint all the local files in candidates we might be matching against
                 _fingerprintingService.Lookup(allLocalTracks, 0.5);
-
                 GetBestRelease(localAlbumRelease, candidateReleases, allLocalTracks);
             }
 
-            _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
-
             localAlbumRelease.PopulateMatch();
+
+            _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
 
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
         }

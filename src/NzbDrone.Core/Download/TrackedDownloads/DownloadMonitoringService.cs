@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Common.TPL;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles.Events;
@@ -12,6 +13,7 @@ using NzbDrone.Core.Messaging.Events;
 namespace NzbDrone.Core.Download.TrackedDownloads
 {
     public class DownloadMonitoringService : IExecute<RefreshMonitoredDownloadsCommand>,
+                                             IExecute<RetryAiMatchesCommand>,
                                              IExecute<CheckForFinishedDownloadCommand>,
                                              IHandle<AlbumGrabbedEvent>,
                                              IHandle<TrackImportedEvent>,
@@ -57,7 +59,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _manageCommandQueue.Push(new RefreshMonitoredDownloadsCommand(), CommandPriority.High);
         }
 
-        private void Refresh()
+        private void Refresh(bool retryAiMatching = false, bool queueOnly = false, bool processDownloads = true)
         {
             _refreshDebounce.Pause();
             try
@@ -68,14 +70,17 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
                 foreach (var downloadClient in downloadClients)
                 {
-                    var clientTrackedDownloads = ProcessClientDownloads(downloadClient);
+                    var clientTrackedDownloads = ProcessClientDownloads(downloadClient, retryAiMatching, queueOnly);
 
                     trackedDownloads.AddRange(clientTrackedDownloads.Where(DownloadIsTrackable));
                 }
 
                 _trackedDownloadService.UpdateTrackable(trackedDownloads);
                 _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(trackedDownloads));
-                _manageCommandQueue.Push(new ProcessMonitoredDownloadsCommand(), CommandPriority.High);
+                if (processDownloads && !queueOnly)
+                {
+                    _manageCommandQueue.Push(new ProcessMonitoredDownloadsCommand(), CommandPriority.High);
+                }
             }
             finally
             {
@@ -83,7 +88,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             }
         }
 
-        private List<TrackedDownload> ProcessClientDownloads(IDownloadClient downloadClient)
+        private List<TrackedDownload> ProcessClientDownloads(IDownloadClient downloadClient, bool retryAiMatching, bool queueOnly)
         {
             var downloadClientItems = new List<DownloadClientItem>();
             var trackedDownloads = new List<TrackedDownload>();
@@ -102,14 +107,14 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
             foreach (var downloadItem in downloadClientItems)
             {
-                var item = ProcessClientItem(downloadClient, downloadItem);
+                var item = ProcessClientItem(downloadClient, downloadItem, retryAiMatching, queueOnly);
                 trackedDownloads.AddIfNotNull(item);
             }
 
             return trackedDownloads;
         }
 
-        private TrackedDownload ProcessClientItem(IDownloadClient downloadClient, DownloadClientItem downloadItem)
+        private TrackedDownload ProcessClientItem(IDownloadClient downloadClient, DownloadClientItem downloadItem, bool retryAiMatching, bool queueOnly)
         {
             TrackedDownload trackedDownload = null;
 
@@ -119,7 +124,14 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     _trackedDownloadService.TrackDownload((DownloadClientDefinition)downloadClient.Definition,
                         downloadItem);
 
-                if (trackedDownload is { State: TrackedDownloadState.Downloading or TrackedDownloadState.ImportBlocked })
+                if (retryAiMatching && trackedDownload?.State == TrackedDownloadState.ImportFailed &&
+                    downloadItem.Status == DownloadItemStatus.Completed)
+                {
+                    // Only Retry AI rearms held/rejected imports. Scheduled polling and Queue Refresh do not.
+                    trackedDownload.State = TrackedDownloadState.Downloading;
+                }
+
+                if (!queueOnly && trackedDownload is { State: TrackedDownloadState.Downloading or TrackedDownloadState.ImportBlocked })
                 {
                     _failedDownloadService.Check(trackedDownload);
                     _completedDownloadService.Check(trackedDownload);
@@ -154,7 +166,44 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         public void Execute(RefreshMonitoredDownloadsCommand message)
         {
-            Refresh();
+            Refresh(queueOnly: message.QueueOnly);
+        }
+
+        public void Execute(RetryAiMatchesCommand message)
+        {
+            if (!_configService.EnableCompletedDownloadHandling)
+            {
+                _logger.ProgressInfo("Completed download handling is disabled; no AI retries were submitted");
+                return;
+            }
+
+            Refresh(retryAiMatching: true, processDownloads: false);
+
+            var downloads = _trackedDownloadService.GetTrackedDownloads()
+                .Where(d => d.IsTrackable && d.DownloadItem.Status == DownloadItemStatus.Completed && d.State == TrackedDownloadState.ImportPending)
+                .ToList();
+            var index = 0;
+            foreach (var download in downloads)
+            {
+                // Another import worker may have picked this item up while the queue was refreshed.
+                if (download.State != TrackedDownloadState.ImportPending)
+                {
+                    continue;
+                }
+
+                _logger.ProgressInfo("Retrying identification for download {0}/{1}: {2}", ++index, downloads.Count, download.DownloadItem.Title);
+                try
+                {
+                    _completedDownloadService.Import(download);
+                }
+                catch (Exception ex)
+                {
+                    download.State = TrackedDownloadState.ImportFailed;
+                    _logger.Warn(ex, "AI retry failed for download {0}", download.DownloadItem.Title);
+                }
+            }
+
+            _eventAggregator.PublishEvent(new DownloadsProcessedEvent());
         }
 
         public void Execute(CheckForFinishedDownloadCommand message)

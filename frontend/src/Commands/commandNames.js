@@ -1,6 +1,7 @@
 export const APPLICATION_UPDATE = 'ApplicationUpdate';
 export const BACKUP = 'Backup';
 export const REFRESH_MONITORED_DOWNLOADS = 'RefreshMonitoredDownloads';
+export const RETRY_AI_MATCHES = 'RetryAiMatches';
 export const CLEAR_BLOCKLIST = 'ClearBlocklist';
 export const CLEAR_LOGS = 'ClearLog';
 export const CUTOFF_UNMET_ALBUM_SEARCH = 'CutoffUnmetAlbumSearch';

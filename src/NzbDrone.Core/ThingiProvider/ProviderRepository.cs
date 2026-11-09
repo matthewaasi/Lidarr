@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +16,7 @@ namespace NzbDrone.Core.ThingiProvider
         where TProviderDefinition : ProviderDefinition,
             new()
     {
+        private static readonly ConcurrentDictionary<string, byte> ReportedUnknownProviders = new ConcurrentDictionary<string, byte>();
         protected readonly JsonSerializerOptions _serializerSettings;
         private readonly Logger _logger;
 
@@ -60,13 +62,20 @@ namespace NzbDrone.Core.ThingiProvider
                     var body = reader.IsDBNull(settingsIndex) ? null : reader.GetString(settingsIndex);
                     var item = parser(reader);
                     var impType = ReflectionExtensions.FindTypeByName(item.ConfigContract);
+                    var missingProviderKey = $"{item.Id}:{item.ConfigContract}";
 
                     // If the type is missing
                     if (impType == null)
                     {
-                        _logger.Warn($"Skipping provider of unknown type {item.ConfigContract}");
+                        if (ReportedUnknownProviders.TryAdd(missingProviderKey, 0))
+                        {
+                            _logger.Warn("Skipping unavailable provider '{0}' (ID {1}, settings type {2}). Its saved configuration is retained. Restore the provider/plugin or remove the obsolete entry. Repeated warnings for this entry are suppressed until the provider returns or Lidarr restarts.", item.Name, item.Id, item.ConfigContract);
+                        }
+
                         continue;
                     }
+
+                    ReportedUnknownProviders.TryRemove(missingProviderKey, out _);
 
                     if (body.IsNullOrWhiteSpace() || impType == null)
                     {

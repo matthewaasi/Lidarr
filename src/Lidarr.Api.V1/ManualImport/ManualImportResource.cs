@@ -5,6 +5,7 @@ using Lidarr.Api.V1.Artist;
 using Lidarr.Api.V1.Tracks;
 using Lidarr.Http.REST;
 using NzbDrone.Core.DecisionEngine;
+using NzbDrone.Core.MediaFiles.TrackImport.Identification;
 using NzbDrone.Core.MediaFiles.TrackImport.Manual;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
@@ -26,6 +27,7 @@ namespace Lidarr.Api.V1.ManualImport
         public string DownloadId { get; set; }
         public int IndexerFlags { get; set; }
         public IEnumerable<Rejection> Rejections { get; set; }
+        public AiMatchResult AiMatch { get; set; }
         public ParsedTrackInfo AudioTags { get; set; }
         public bool AdditionalFile { get; set; }
         public bool ReplaceExistingFiles { get; set; }
@@ -58,6 +60,7 @@ namespace Lidarr.Api.V1.ManualImport
                 DownloadId = model.DownloadId,
                 IndexerFlags = model.IndexerFlags,
                 Rejections = model.Rejections,
+                AiMatch = model.AiMatch,
 
                 AudioTags = model.Tags,
                 AdditionalFile = model.AdditionalFile,

@@ -10,6 +10,7 @@ using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.TrackImport;
+using NzbDrone.Core.MediaFiles.TrackImport.Identification;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser;
@@ -113,6 +114,45 @@ namespace NzbDrone.Core.Test.Download.CompletedDownloadServiceTests
             Mocker.GetMock<IParsingService>()
                   .Setup(s => s.GetArtist(It.IsAny<string>()))
                   .Returns(_trackedDownload.RemoteAlbum.Artist);
+        }
+
+        [TestCase("no_match", true)]
+        [TestCase("error", true)]
+        [TestCase("review", false)]
+        public void ai_errors_must_be_red_but_review_holds_must_remain_warnings(string status, bool error)
+        {
+            var file = new LocalTrack
+            {
+                Path = @"C:\Test\track.flac".AsOsAgnostic(),
+                AiMatch = new AiMatchResult { Status = status, IsError = error, Reason = "Test result" }
+            };
+            Mocker.GetMock<IDownloadedTracksImportService>()
+                .Setup(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Artist>(), It.IsAny<DownloadClientItem>()))
+                .Returns(new List<ImportResult> { new ImportResult(new ImportDecision<LocalTrack>(file, new Rejection("Test result")), "Test result") });
+
+            Subject.Import(_trackedDownload);
+
+            Assert.That(_trackedDownload.Status, Is.EqualTo(error ? TrackedDownloadStatus.Error : TrackedDownloadStatus.Warning));
+            AssertNotImported();
+        }
+
+        [Test]
+        public void a_non_matching_extra_file_must_not_be_hidden_by_a_satisfied_track_count()
+        {
+            var good = new LocalTrack { Path = "good.flac", Tracks = new List<Track> { new Track { Id = 1 } } };
+            var bad = new LocalTrack { Path = "wrong.flac", AiMatch = new AiMatchResult { IsError = true, Status = "no_match" } };
+            Mocker.GetMock<IDownloadedTracksImportService>()
+                .Setup(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Artist>(), It.IsAny<DownloadClientItem>()))
+                .Returns(new List<ImportResult>
+                {
+                    new ImportResult(new ImportDecision<LocalTrack>(good)),
+                    new ImportResult(new ImportDecision<LocalTrack>(bad, new Rejection("No candidate matches")), "No candidate matches")
+                });
+
+            Subject.Import(_trackedDownload);
+
+            Assert.That(_trackedDownload.Status, Is.EqualTo(TrackedDownloadStatus.Error));
+            AssertNotImported();
         }
 
         [Test]

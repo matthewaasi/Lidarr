@@ -63,6 +63,19 @@
   flex: 0 0 45px;
 }
 
+.searchButton {
+  composes: button from '~Components/Link/IconButton.css';
+
+  width: 42px;
+  height: 38px;
+}
+
+.searchError {
+  padding: 0 10px 10px;
+  color: var(--dangerColor);
+  font-size: $defaultFontSize;
+}
+
 .actionsMenuContent {
   composes: menuContent from '~Components/Menu/MenuContent.css';
 

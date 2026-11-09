@@ -1,0 +1,49 @@
+.settings {
+  max-width: 850px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 20px 0;
+  gap: 7px;
+}
+
+.field span {
+  font-weight: bold;
+}
+
+.field input:not([type='checkbox']),
+.field select {
+  padding: 8px;
+  max-width: 100%;
+  width: 420px;
+  border: 1px solid #888;
+  border-radius: 3px;
+  background: var(--inputBackgroundColor);
+  color: inherit;
+}
+
+.field input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+
+.field small {
+  opacity: 0.8;
+}
+
+.button {
+  padding: 8px 18px;
+  border: 1px solid #888;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

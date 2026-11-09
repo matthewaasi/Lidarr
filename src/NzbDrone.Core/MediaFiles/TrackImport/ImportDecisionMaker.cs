@@ -5,6 +5,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.MediaFiles.TrackImport.Aggregation;
@@ -41,6 +42,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         public bool SingleRelease { get; set; }
         public bool IncludeExisting { get; set; }
         public bool AddNewArtists { get; set; }
+        public bool UseCachedIdentificationOnly { get; set; }
     }
 
     public class ImportDecisionMaker : IMakeImportDecision
@@ -51,6 +53,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         private readonly IAudioTagService _audioTagService;
         private readonly IAugmentingService _augmentingService;
         private readonly IIdentificationService _identificationService;
+        private readonly IAiImportDecisionCache _aiDecisionCache;
+        private readonly IConfigService _configService;
         private readonly IRootFolderService _rootFolderService;
         private readonly IQualityProfileService _qualityProfileService;
         private readonly Logger _logger;
@@ -61,6 +65,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                                    IAudioTagService audioTagService,
                                    IAugmentingService augmentingService,
                                    IIdentificationService identificationService,
+                                   IAiImportDecisionCache aiDecisionCache,
+                                   IConfigService configService,
                                    IRootFolderService rootFolderService,
                                    IQualityProfileService qualityProfileService,
                                    Logger logger)
@@ -71,6 +77,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
             _audioTagService = audioTagService;
             _augmentingService = augmentingService;
             _identificationService = identificationService;
+            _aiDecisionCache = aiDecisionCache;
+            _configService = configService;
             _rootFolderService = rootFolderService;
             _qualityProfileService = qualityProfileService;
             _logger = logger;
@@ -150,6 +158,12 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             localTracks.ForEach(x => x.ExistingFile = !config.NewDownload);
 
+            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine != "Original")
+            {
+                decisions.AddRange(_aiDecisionCache.Read(localTracks));
+                return decisions;
+            }
+
             var releases = _identificationService.Identify(localTracks, idOverrides, config);
 
             var albums = releases.GroupBy(x => x.AlbumRelease?.Album?.Value.ForeignAlbumId);
@@ -165,6 +179,15 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                     // in case it's a new artist
                     EnsureData(release);
                     release.NewDownload = config.NewDownload;
+
+                    if (config.NewDownload && release.TrackMapping?.MBExtra?.Count > 0 &&
+                        release.TrackCount < release.TrackMapping.Mapping.Count + release.TrackMapping.MBExtra.Count)
+                    {
+                        foreach (var file in release.LocalTracks.Where(f => f.AiMatch != null))
+                        {
+                            file.AiMatch.IsError = true;
+                        }
+                    }
 
                     albumDecisions.Add(GetDecision(release, itemInfo.DownloadClientItem));
                 }
@@ -194,6 +217,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                 }
             }
 
+            _aiDecisionCache.Save(decisions);
             return decisions;
         }
 
@@ -216,7 +240,9 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             if (localAlbumRelease.AlbumRelease == null)
             {
-                decision = new ImportDecision<LocalAlbumRelease>(localAlbumRelease, new Rejection($"Couldn't find similar album for {localAlbumRelease}"));
+                decision = new ImportDecision<LocalAlbumRelease>(localAlbumRelease, new Rejection(localAlbumRelease.AiMatch != null
+                    ? "AI manual review: " + localAlbumRelease.AiMatch.Reason
+                    : $"Couldn't find similar album for {localAlbumRelease}"));
             }
             else
             {
@@ -246,7 +272,11 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         {
             ImportDecision<LocalTrack> decision = null;
 
-            if (localTrack.Tracks.Empty())
+            if (localTrack.AiMatch != null && !localTrack.AiMatch.Accepted)
+            {
+                decision = new ImportDecision<LocalTrack>(localTrack, new Rejection("AI manual review: " + localTrack.AiMatch.Reason));
+            }
+            else if (localTrack.Tracks.Empty())
             {
                 decision = localTrack.Album != null ? new ImportDecision<LocalTrack>(localTrack, new Rejection($"Couldn't parse track from: {localTrack.FileTrackInfo}")) :
                     new ImportDecision<LocalTrack>(localTrack, new Rejection($"Couldn't parse album from: {localTrack.FileTrackInfo}"));
