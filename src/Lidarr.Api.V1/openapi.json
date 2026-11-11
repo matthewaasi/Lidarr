@@ -9593,6 +9593,13 @@
             "type": "string",
             "nullable": true
           },
+          "queueRefreshIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 86400,
+            "description": "Seconds between automatic download client queue refreshes. Defaults to 60."
+          },
           "enableCompletedDownloadHandling": {
             "type": "boolean"
           },
@@ -12704,8 +12711,9 @@
             "nullable": true
           },
           "interval": {
-            "type": "integer",
-            "format": "int32"
+            "type": "number",
+            "format": "double",
+            "description": "Interval in minutes, including fractional minutes for queue refreshes."
           },
           "lastExecution": {
             "type": "string",

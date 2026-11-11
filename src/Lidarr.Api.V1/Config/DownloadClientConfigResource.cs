@@ -6,7 +6,7 @@ namespace Lidarr.Api.V1.Config
     public class DownloadClientConfigResource : RestResource
     {
         public string DownloadClientWorkingFolders { get; set; }
-        public int QueueRefreshInterval { get; set; }
+        public int QueueRefreshIntervalSeconds { get; set; }
         public bool EnableCompletedDownloadHandling { get; set; }
         public bool AutoRedownloadFailed { get; set; }
         public bool AutoRedownloadFailedFromInteractiveSearch { get; set; }
@@ -20,7 +20,7 @@ namespace Lidarr.Api.V1.Config
             {
                 DownloadClientWorkingFolders = model.DownloadClientWorkingFolders,
 
-                QueueRefreshInterval = model.QueueRefreshInterval,
+                QueueRefreshIntervalSeconds = model.QueueRefreshIntervalSeconds,
                 EnableCompletedDownloadHandling = model.EnableCompletedDownloadHandling,
                 AutoRedownloadFailed = model.AutoRedownloadFailed,
                 AutoRedownloadFailedFromInteractiveSearch = model.AutoRedownloadFailedFromInteractiveSearch

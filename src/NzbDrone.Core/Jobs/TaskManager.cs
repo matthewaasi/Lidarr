@@ -47,7 +47,7 @@ namespace NzbDrone.Core.Jobs
         public IList<ScheduledTask> GetPending()
         {
             return _cache.Values
-                         .Where(c => c.Interval > 0 && c.LastExecution.AddMinutes(c.Interval) < DateTime.UtcNow)
+                         .Where(c => c.GetInterval() > TimeSpan.Zero && c.LastExecution.Add(c.GetInterval()) <= DateTime.UtcNow)
                          .ToList();
         }
 
@@ -60,7 +60,7 @@ namespace NzbDrone.Core.Jobs
         {
             var scheduledTask = _cache.Find(type.FullName);
 
-            return scheduledTask.LastExecution.AddMinutes(scheduledTask.Interval);
+            return scheduledTask.LastExecution.Add(scheduledTask.GetInterval());
         }
 
         public void Handle(ApplicationStartedEvent message)
@@ -69,7 +69,8 @@ namespace NzbDrone.Core.Jobs
                 {
                     new ScheduledTask
                     {
-                        Interval = Math.Clamp(_configService.QueueRefreshInterval, 1, 1440),
+                        Interval = 1,
+                        IntervalSeconds = Math.Clamp(_configService.QueueRefreshIntervalSeconds, 1, 86400),
                         TypeName = typeof(RefreshMonitoredDownloadsCommand).FullName,
                         Priority = CommandPriority.High
                     },
@@ -154,6 +155,7 @@ namespace NzbDrone.Core.Jobs
                 var currentDefinition = currentTasks.SingleOrDefault(c => c.TypeName == defaultTask.TypeName) ?? defaultTask;
 
                 currentDefinition.Interval = defaultTask.Interval;
+                currentDefinition.IntervalSeconds = defaultTask.IntervalSeconds;
 
                 if (currentDefinition.Id == 0)
                 {
@@ -224,7 +226,8 @@ namespace NzbDrone.Core.Jobs
         public void HandleAsync(ConfigSavedEvent message)
         {
             var queue = _scheduledTaskRepository.GetDefinition(typeof(RefreshMonitoredDownloadsCommand));
-            queue.Interval = Math.Clamp(_configService.QueueRefreshInterval, 1, 1440);
+            queue.Interval = 1;
+            queue.IntervalSeconds = Math.Clamp(_configService.QueueRefreshIntervalSeconds, 1, 86400);
 
             var rss = _scheduledTaskRepository.GetDefinition(typeof(RssSyncCommand));
             rss.Interval = GetRssSyncInterval();
@@ -235,6 +238,7 @@ namespace NzbDrone.Core.Jobs
             _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup, queue });
 
             _cache.Find(queue.TypeName).Interval = queue.Interval;
+            _cache.Find(queue.TypeName).IntervalSeconds = queue.IntervalSeconds;
             _cache.Find(rss.TypeName).Interval = rss.Interval;
             _cache.Find(backup.TypeName).Interval = backup.Interval;
         }

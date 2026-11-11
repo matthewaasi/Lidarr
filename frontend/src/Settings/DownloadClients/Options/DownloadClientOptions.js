@@ -42,12 +42,12 @@ function DownloadClientOptions(props) {
                 <FormLabel>{translate('QueueRefreshInterval')}</FormLabel>
                 <FormInputGroup
                   type={inputTypes.NUMBER}
-                  name="queueRefreshInterval"
+                  name="queueRefreshIntervalSeconds"
                   min={1}
-                  max={1440}
+                  max={86400}
                   helpText={translate('QueueRefreshIntervalHelpText')}
                   onChange={onInputChange}
-                  {...settings.queueRefreshInterval}
+                  {...settings.queueRefreshIntervalSeconds}
                 />
               </FormGroup>
             </Form>

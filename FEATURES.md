@@ -1,4 +1,4 @@
-# Features — 3.2.1.5196-ai.11
+# Features — 3.2.1.5196-ai.12
 
 - LM Studio album/track identification with Review and Automatic modes, strict result validation and configurable request settings.
 - Native release-type search buttons on artist pages.
@@ -8,7 +8,7 @@
 - Bounded, staged AI requests and adaptive context/output-limit subdivision.
 - Settings-selectable Original, LM Studio, and native-first/AI-fallback identification with native score and AI settings.
 - Optional native Unique Singles cleanup, a separate Singles Review page, and monitoring restoration when coverage disappears.
-- Queue AI disposition summary and configurable scheduled refresh interval.
+- Queue AI disposition summary and a seconds-based scheduled refresh interval (1–86,400 seconds; default 60). Existing minute-based settings retain their duration.
 - Manual track selection works when no release was identified.
 - Read-only Library Audit, persistent audit review, optional fingerprint evidence, exact-file duplicate checks, and library/artist page performance improvements.
 

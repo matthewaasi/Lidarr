@@ -196,6 +196,13 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("QueueRefreshInterval", value); }
         }
 
+        public int QueueRefreshIntervalSeconds
+        {
+            // Preserve existing minute-based settings until a seconds value is saved.
+            get { return GetValueInt("QueueRefreshIntervalSeconds", Math.Clamp(QueueRefreshInterval, 1, 1440) * 60); }
+            set { SetValue("QueueRefreshIntervalSeconds", value); }
+        }
+
         public bool EnableCompletedDownloadHandling
         {
             get { return GetValueBoolean("EnableCompletedDownloadHandling", true); }

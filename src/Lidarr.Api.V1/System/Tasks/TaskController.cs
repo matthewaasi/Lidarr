@@ -53,10 +53,10 @@ namespace Lidarr.Api.V1.System.Tasks
                 Id = scheduledTask.Id,
                 Name = taskName.SplitCamelCase(),
                 TaskName = taskName,
-                Interval = scheduledTask.Interval,
+                Interval = scheduledTask.GetInterval().TotalMinutes,
                 LastExecution = scheduledTask.LastExecution,
                 LastStartTime = scheduledTask.LastStartTime,
-                NextExecution = scheduledTask.LastExecution.AddMinutes(scheduledTask.Interval)
+                NextExecution = scheduledTask.LastExecution.Add(scheduledTask.GetInterval())
             };
         }
 

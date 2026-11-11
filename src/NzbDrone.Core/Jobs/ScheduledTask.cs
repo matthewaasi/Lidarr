@@ -8,9 +8,15 @@ namespace NzbDrone.Core.Jobs
     {
         public string TypeName { get; set; }
         public int Interval { get; set; }
+        public int? IntervalSeconds { get; set; }
         public DateTime LastExecution { get; set; }
         public CommandPriority Priority { get; set; }
         public DateTime LastStartTime { get; set; }
+
+        public TimeSpan GetInterval()
+        {
+            return IntervalSeconds.HasValue ? TimeSpan.FromSeconds(IntervalSeconds.Value) : TimeSpan.FromMinutes(Interval);
+        }
 
         public ScheduledTask()
         {

@@ -10,7 +10,7 @@ namespace Lidarr.Api.V1.Config
         public DownloadClientConfigController(IConfigService configService)
             : base(configService)
         {
-            SharedValidator.RuleFor(c => c.QueueRefreshInterval).InclusiveBetween(1, 1440);
+            SharedValidator.RuleFor(c => c.QueueRefreshIntervalSeconds).InclusiveBetween(1, 86400);
         }
 
         protected override DownloadClientConfigResource ToResource(IConfigService model)

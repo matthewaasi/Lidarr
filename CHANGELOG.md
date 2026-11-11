@@ -2,6 +2,16 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.12 — Queue refresh interval in seconds
+
+- Settings → Download Clients → Queue now accepts a whole number of seconds from 1–86,400; default 60 seconds.
+- Existing minute-based values are converted on read unless a seconds setting has been saved (5 minutes becomes 300 seconds).
+- Saving updates the live schedule. A one-second scheduler tick supports sub-minute intervals; execution depends on task completion and queue availability.
+- Other scheduled task intervals retain minute units. System → Tasks reports the queue's actual next execution and fractional-minute API interval.
+- The download-client configuration API uses `queueRefreshIntervalSeconds`. No database schema migration is required.
+
+**Recorded verification:** 70 tests passed (20 core, 10 API, 40 frontend). Production UI and Linux publishing passed. Corrected the initial local archive’s duplicate fpcalc entry and verified unique paths in all image layers. Docker loading and Linux container startup require deployment-host verification.
+
 ## 3.2.1.5196-ai.11 — Library Audit and faster library pages
 
 - Added Library → Audit for read-only review of version-label and duration mismatches, optional fingerprint evidence, and exact duplicate files.

@@ -1398,6 +1398,6 @@
   "AiIssuesFound": "Issues found",
   "AiNotAMatch": "Not a match",
   "AiNotAssessed": "Not assessed",
-  "QueueRefreshInterval": "Queue Refresh Interval",
-  "QueueRefreshIntervalHelpText": "Minutes between automatic download client queue refreshes (1-1440). Default: 1 minute. Changes apply immediately."
+  "QueueRefreshInterval": "Queue Refresh Interval (seconds)",
+  "QueueRefreshIntervalHelpText": "Seconds between automatic download client queue refreshes (1-86400). Default: 60 seconds. Changes apply immediately. Running refreshes must finish before the next interval begins."
 }
