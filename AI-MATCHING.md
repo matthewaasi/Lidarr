@@ -1,4 +1,4 @@
-# Lidarr AI Matcher — 3.2.1.5196-ai.1
+# Lidarr AI Matcher — 3.2.1.5196-ai.2
 
 Based on upstream `Lidarr/Lidarr` tag `v3.2.1.5196`, commit `6af1274a11957270a308fd0448ffe624a8e264d0`.
 The container uses LinuxServer's `nightly-3.2.1.5196-ls224` runtime and s6 startup.
@@ -42,7 +42,7 @@ Manual Import's review popover shows the explanation and candidate releases. The
 On an x86-64 Docker host, from this source directory:
 
 ```sh
-docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.1 .
+docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.2 .
 ```
 
 The multi-stage Dockerfile builds the UI with Node 22/Yarn 1.22.22 and publishes the application plus the dynamically loaded `Lidarr.Mono` platform library with .NET SDK 8.0.421 for `linux-musl-x64`.
@@ -52,3 +52,17 @@ Plugin APIs and plugin storage are retained. Tidal and UniqueSingles remain sepa
 The public legacy `MapReleaseTracks` helper is retained for binary/source compatibility, but the built-in identification pipeline no longer calls it. Explicit human track selections in Manual Import remain supported.
 
 This is a local fork under the upstream GPL-3.0 license. No GitHub fork or public registry image has been published.
+
+## Native release-type search (ai.2)
+
+The artist page has a search button on every existing release-type header, including collapsed sections. It queues Lidarr's standard `AlbumSearch` command for the monitored releases listed in that artist's section. Completed releases remain eligible so normal quality-upgrade rules can apply. Unmonitored releases and releases belonging to other artists or sections are excluded.
+
+The button displays a spinner and is disabled while its request is being submitted or an overlapping album/artist search is queued or running. A failed submission shows a retryable error beside the section. Running/completed/failed search progress uses Lidarr's normal command notifications. The native authentication and API URL handling are used, with no TamperMonkey extension or separately stored API key.
+
+Live and Compilation are secondary metadata classifications and remain within the existing primary-type groups; this feature does not introduce overlapping new groups. It also works for Broadcast, Other, and any other existing group rather than hardcoding a list of headings. Disable the old TamperMonkey script when using this build to avoid its additional injected buttons.
+
+Focused UI tests can be run after installing the frontend dependencies:
+
+```sh
+node --test frontend/test/releaseTypeSearch.test.cjs
+```

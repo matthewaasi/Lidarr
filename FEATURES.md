@@ -1,6 +1,7 @@
-# Features — 3.2.1.5196-ai.1
+# Features — 3.2.1.5196-ai.2
 
 - LM Studio album/track identification with Review and Automatic modes, strict result validation and configurable request settings.
+- Native release-type search buttons on artist pages.
 
 ## Compatibility
 

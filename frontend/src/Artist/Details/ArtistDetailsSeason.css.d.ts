@@ -18,6 +18,8 @@ interface CssExports {
   'header': string;
   'left': string;
   'noAlbums': string;
+  'searchButton': string;
+  'searchError': string;
   'sizeOnDisk': string;
 }
 export const cssExports: CssExports;
