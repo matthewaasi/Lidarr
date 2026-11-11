@@ -23,13 +23,13 @@ COPY --from=frontend /src/_output/UI/ /app/lidarr/bin/UI/
 COPY LICENSE.md /app/lidarr/bin/LICENSE.md
 COPY LICENSES/ /app/lidarr/bin/LICENSES/
 RUN chmod 755 /app/lidarr/bin/Lidarr \
-    && printf 'UpdateMethod=docker\nBranch=nightly\nPackageVersion=3.2.1.5196-ai.8\nPackageAuthor=Lidarr AI local fork\n' > /app/lidarr/package_info
+    && printf 'UpdateMethod=docker\nBranch=nightly\nPackageVersion=3.2.1.5196-ai.9\nPackageAuthor=Lidarr AI local fork\n' > /app/lidarr/package_info
 ENV LIDARR_AI_MODE=Review \
     LIDARR_AI_BASE_URL=http://10.0.0.88:1234/v1 \
     LIDARR_AI_MODEL=qwen/qwen3.8-27b
 LABEL org.opencontainers.image.title="Lidarr AI Matcher" \
-      org.opencontainers.image.version="3.2.1.5196-ai.8" \
-      org.opencontainers.image.revision="e520a88df+ai.8" \
+      org.opencontainers.image.version="3.2.1.5196-ai.9" \
+      org.opencontainers.image.revision="c66957baa+ai.9" \
       org.opencontainers.image.licenses="GPL-3.0"
 EXPOSE 8686
 VOLUME /config

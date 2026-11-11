@@ -47,7 +47,11 @@ class SelectTrackModalContentConnector extends Component {
       albumReleaseId
     } = this.props;
 
-    this.props.fetchTracks({ artistId, albumId, albumReleaseId });
+    this.props.fetchTracks({
+      artistId,
+      albumId,
+      albumReleaseId: albumReleaseId > 0 ? albumReleaseId : undefined
+    });
   }
 
   componentWillUnmount() {
@@ -74,6 +78,7 @@ class SelectTrackModalContentConnector extends Component {
 
     this.props.updateInteractiveImportItem({
       id: this.props.id,
+      albumReleaseId: tracks.length ? tracks[0].albumReleaseId : this.props.albumReleaseId,
       tracks: _.sortBy(tracks, 'trackNumber')
     });
 
@@ -98,7 +103,7 @@ SelectTrackModalContentConnector.propTypes = {
   id: PropTypes.number.isRequired,
   artistId: PropTypes.number.isRequired,
   albumId: PropTypes.number.isRequired,
-  albumReleaseId: PropTypes.number.isRequired,
+  albumReleaseId: PropTypes.number,
   rejections: PropTypes.arrayOf(PropTypes.object).isRequired,
   audioTags: PropTypes.object.isRequired,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,

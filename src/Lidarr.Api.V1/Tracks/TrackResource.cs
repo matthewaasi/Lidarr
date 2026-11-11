@@ -16,6 +16,7 @@ namespace Lidarr.Api.V1.Tracks
         public string ForeignRecordingId { get; set; }
         public int TrackFileId { get; set; }
         public int AlbumId { get; set; }
+        public int AlbumReleaseId { get; set; }
         public bool Explicit { get; set; }
         public int AbsoluteTrackNumber { get; set; }
         public string TrackNumber { get; set; }
@@ -52,6 +53,7 @@ namespace Lidarr.Api.V1.Tracks
                 ForeignRecordingId = model.ForeignRecordingId,
                 TrackFileId = model.TrackFileId,
                 AlbumId = model.AlbumId,
+                AlbumReleaseId = model.AlbumReleaseId,
                 Explicit = model.Explicit,
                 AbsoluteTrackNumber = model.AbsoluteTrackNumber,
                 TrackNumber = model.TrackNumber,

@@ -2,6 +2,14 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.9 — Manual track-picker recovery
+
+- Fixed “No tracks were found for the selected album” when matching has not assigned a release.
+- Missing or zero release IDs now use the album’s monitored release for track selection; selecting a track carries its release ID into the final import payload.
+- Preserved exact track lists for valid identified releases and retained the requirement for actual album track metadata; no new database migration.
+
+**Recorded verification:** 32 frontend tests passed, including six manual-import regressions; changed-file lint and the production build passed. Backend analyzers remained disabled for this build.
+
 ## 3.2.1.5196-ai.8 — Queue AI disposition and refresh settings
 
 - Added the Queue AI Summary column: Approved, Not a match, Issues found or Not assessed.
