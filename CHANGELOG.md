@@ -2,6 +2,16 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.6 — Staged AI matching
+
+- Split large candidate sets, file batches and long track lists into bounded requests, then compared proposals before applying a combined decision.
+- Preserved global identifiers and rejected duplicate assignments across stages; later-stage failure cannot apply a partial success.
+- Added adaptive subdivision for recognized context-limit errors and smaller file batches for truncated output.
+- Added configurable defaults of eight files and an 18,000-character request target, short-reason instructions, stage logging and bounded request/depth limits.
+- Kept uncertain candidate branches in review and capped final confidence by supporting stage evidence; character limits are not exact token guarantees.
+
+**Recorded verification:** 86 backend and 19 frontend tests passed.
+
 ## 3.2.1.5196-ai.5 — Complete-release protection and queue severity
 
 - Blocked automatic import of new downloads missing expected tracks, including a one-file download identified as a two-track single; errors show missing counts and titles.

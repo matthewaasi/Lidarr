@@ -70,6 +70,196 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             _matcher.Identify(_local, _candidates, new List<LocalTrack>());
         }
 
+        private static JObject Input(JObject payload)
+        {
+            return JObject.Parse((string)payload["messages"][1]["content"]);
+        }
+
+        private static JObject Response(JObject answer, string finish = "stop")
+        {
+            return new JObject
+            {
+                ["choices"] = new JArray(new JObject
+                {
+                    ["finish_reason"] = finish,
+                    ["message"] = new JObject { ["content"] = answer.ToString(Formatting.None) }
+                })
+            };
+        }
+
+        private static JObject StageAnswer(JObject input)
+        {
+            var candidate = input["candidates"][0];
+            var id = (string)candidate["candidateId"];
+            var rows = new JArray(((JArray)input["files"]).Select(f =>
+            {
+                var fileId = (string)f["fileId"];
+                var trackId = string.Concat(id, "t", fileId.AsSpan(1));
+                var exists = ((JArray)candidate["tracks"]).Any(t => (string)t["trackId"] == trackId);
+                return new JObject
+                {
+                    ["fileId"] = fileId,
+                    ["trackId"] = exists ? trackId : null,
+                    ["status"] = exists ? "match" : "no_match",
+                    ["confidence"] = 0.99,
+                    ["reason"] = "Recording and duration evidence"
+                };
+            }));
+            return new JObject
+            {
+                ["candidateId"] = rows.Any(r => (string)r["status"] == "match") ? id : null,
+                ["confidence"] = 0.99,
+                ["reason"] = "Album evidence",
+                ["files"] = rows
+            };
+        }
+
+        [Test]
+        public void file_stages_should_preserve_global_tokens_and_review_mode()
+        {
+            _settings.StageFileCount = 1;
+            _settings.Automatic = false;
+            var seen = new List<string>();
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                seen.Add((string)input["files"][0]["fileId"]);
+                return Response(StageAnswer(input));
+            });
+            Identify();
+            Assert.That(seen, Is.EqualTo(new[] { "f0", "f1" }));
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Proposed && !f.AiMatch.Accepted), Is.True);
+            Assert.That(_local.TrackMapping.MBExtra, Is.Empty);
+        }
+
+        [Test]
+        public void duplicate_track_across_file_stages_should_reject_entire_release()
+        {
+            _settings.StageFileCount = 1;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var answer = StageAnswer(Input(payload));
+                answer["files"][0]["trackId"] = "c0t0";
+                return Response(answer);
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.IsError && !f.Tracks.Any()), Is.True);
+        }
+
+        [Test]
+        public void later_stage_failure_should_never_apply_earlier_success()
+        {
+            _settings.StageFileCount = 1;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                if ((string)input["files"][0]["fileId"] == "f1")
+                {
+                    throw new TimeoutException();
+                }
+
+                return Response(StageAnswer(input));
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.Tracks.Any() && !f.AiMatch.Accepted), Is.True);
+        }
+
+        [Test]
+        public void output_limit_should_retry_smaller_file_stages()
+        {
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                return Response(StageAnswer(input), ((JArray)input["files"]).Count > 1 ? "length" : "stop");
+            });
+            Identify();
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.True);
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(3));
+        }
+
+        [Test]
+        public void context_limit_should_page_large_track_lists_without_renumbering()
+        {
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                if (((JArray)input["candidates"][0]["tracks"]).Count > 1)
+                {
+                    throw new LmStudioContextException();
+                }
+
+                return Response(StageAnswer(input));
+            });
+            Identify();
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.True);
+            Assert.That(_local.LocalTracks[1].AiMatch.TrackId, Is.EqualTo("c0t1"));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void candidate_stages_should_compare_finalists_and_preserve_uncertainty(bool uncertain)
+        {
+            var release = _candidates[0].AlbumRelease;
+            _candidates.Add(new CandidateAlbumRelease(new AlbumRelease
+            {
+                Id = 21, AlbumId = 10, Title = "Other edition", Album = release.Album, Tracks = release.Tracks.Value
+            }));
+            var compared = false;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                if (((JArray)input["candidates"]).Count > 1 && input["stage"] == null)
+                {
+                    throw new LmStudioContextException();
+                }
+
+                var answerInput = (JObject)input.DeepClone();
+                if (input["stage"] != null)
+                {
+                    answerInput["candidates"] = new JArray(((JArray)input["candidates"]).Reverse().Select(c => c.DeepClone()));
+                }
+
+                var answer = StageAnswer(answerInput);
+                if (input["stage"] == null)
+                {
+                    answer["confidence"] = 0.96;
+                    foreach (var row in answer["files"])
+                    {
+                        row["confidence"] = 0.96;
+                    }
+                }
+
+                if (input["stage"] != null)
+                {
+                    compared = true;
+                    if (uncertain)
+                    {
+                        answer["candidateId"] = null;
+                        foreach (var row in answer["files"])
+                        {
+                            row["trackId"] = null;
+                            row["status"] = "review";
+                        }
+                    }
+                }
+
+                return Response(answer);
+            });
+            Identify();
+            Assert.That(compared, Is.True);
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.EqualTo(!uncertain));
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.IsError), Is.False);
+            if (!uncertain)
+            {
+                Assert.That(_local.AiMatch.CandidateId, Is.EqualTo("c1"));
+                Assert.That(_local.AiMatch.Confidence, Is.EqualTo(0.96));
+                Assert.That(_local.LocalTracks[0].AiMatch.TrackId, Is.EqualTo("c1t0"));
+                Assert.That(_local.LocalTracks[0].AiMatch.Confidence, Is.EqualTo(0.96));
+            }
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void identification_pipeline_should_route_to_ai_including_when_no_candidates_exist(bool noCandidates)
@@ -99,6 +289,72 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             matcher.Verify(m => m.Identify(It.IsAny<LocalAlbumRelease>(), candidates, It.IsAny<List<LocalTrack>>()), Times.Once());
             fingerprints.Verify(f => f.Lookup(It.IsAny<List<LocalTrack>>(), It.IsAny<double>()), Times.Never());
             Assert.That(releases.Single().LocalTracks[0].AiMatch.Accepted, Is.EqualTo(!noCandidates));
+        }
+
+        [Test]
+        public void large_candidate_set_should_be_bounded_and_evaluate_every_candidate()
+        {
+            var original = _candidates[0].AlbumRelease;
+            _candidates = Enumerable.Range(0, 8).Select(index => new CandidateAlbumRelease(new AlbumRelease
+            {
+                Id = 20 + index, AlbumId = 10, Title = "Edition " + index, Album = original.Album,
+                Tracks = Enumerable.Range(0, 20).Select(t => new Track
+                {
+                    Id = t + 1, AlbumReleaseId = 20 + index, Title = new string('x', 180) + t, Duration = 180000
+                }).ToList()
+            })).ToList();
+            var evaluated = new HashSet<string>();
+            var requests = 0;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                requests++;
+                Assert.That(payload.ToString(Formatting.None).Length, Is.LessThanOrEqualTo(settings.StageRequestCharacters));
+                var input = Input(payload);
+                foreach (var candidate in input["candidates"])
+                {
+                    evaluated.Add((string)candidate["candidateId"]);
+                }
+
+                return Response(StageAnswer(input));
+            });
+            Identify();
+            Assert.That(requests, Is.GreaterThan(1));
+            Assert.That(evaluated, Is.EquivalentTo(Enumerable.Range(0, 8).Select(i => "c" + i)));
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.True);
+        }
+
+        [Test]
+        public void uncertain_candidate_branch_must_not_be_silently_discarded()
+        {
+            var release = _candidates[0].AlbumRelease;
+            _candidates.Add(new CandidateAlbumRelease(new AlbumRelease
+            {
+                Id = 21, AlbumId = 10, Title = "Other edition", Album = release.Album, Tracks = release.Tracks.Value
+            }));
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, settings) =>
+            {
+                var input = Input(payload);
+                if (((JArray)input["candidates"]).Count > 1)
+                {
+                    throw new LmStudioContextException();
+                }
+
+                var answer = StageAnswer(input);
+                if ((string)input["candidates"][0]["candidateId"] == "c1")
+                {
+                    answer["candidateId"] = null;
+                    foreach (var row in answer["files"])
+                    {
+                        row["status"] = "review";
+                        row["trackId"] = null;
+                    }
+                }
+
+                return Response(answer);
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted && !f.AiMatch.IsError), Is.True);
         }
 
         [Test]

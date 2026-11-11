@@ -8,6 +8,14 @@ using Newtonsoft.Json.Linq;
 
 namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 {
+    public class LmStudioContextException : Exception
+    {
+        public LmStudioContextException()
+            : base("LM Studio rejected a request exceeding its available context")
+        {
+        }
+    }
+
     public interface ILmStudioClient
     {
         JObject Complete(JObject payload, LmStudioSettings settings);
@@ -39,6 +47,16 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 using var response = Client.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellation.Token).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                 {
+                    if ((int)response.StatusCode == 400)
+                    {
+                        var error = response.Content.ReadAsStringAsync(cancellation.Token).GetAwaiter().GetResult();
+                        if (error.Contains("context", StringComparison.OrdinalIgnoreCase) &&
+                            (error.Contains("exceed", StringComparison.OrdinalIgnoreCase) || error.Contains("too long", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            throw new LmStudioContextException();
+                        }
+                    }
+
                     // Do not include server response bodies, which can contain credentials or full prompts.
                     throw new HttpRequestException($"LM Studio returned HTTP {(int)response.StatusCode}");
                 }

@@ -14,9 +14,11 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
     [TestFixture]
     public class LmStudioClientFixture
     {
-        [TestCase(200)]
-        [TestCase(503)]
-        public async Task should_send_structured_request_to_configured_endpoint(int status)
+        [TestCase(200, false)]
+        [TestCase(503, false)]
+        [TestCase(400, false)]
+        [TestCase(400, true)]
+        public async Task should_send_structured_request_to_configured_endpoint(int status, bool contextError)
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -44,7 +46,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
                     received = Encoding.UTF8.GetString(bytes, 0, count);
                 }
 
-                var body = "{\"choices\":[]}";
+                var body = contextError ? "{\"error\":\"request exceeds available context size\"}" : "{\"choices\":[]}";
                 var response = Encoding.UTF8.GetBytes($"HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}");
                 await stream.WriteAsync(response, cancellation.Token);
                 return received;
@@ -54,6 +56,10 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             {
                 var result = new LmStudioClient().Complete(payload, settings);
                 Assert.That(result["choices"], Is.TypeOf<JArray>());
+            }
+            else if (contextError)
+            {
+                Assert.Throws<LmStudioContextException>(() => new LmStudioClient().Complete(payload, settings));
             }
             else
             {

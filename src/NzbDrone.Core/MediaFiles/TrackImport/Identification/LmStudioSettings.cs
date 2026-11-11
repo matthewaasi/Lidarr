@@ -19,6 +19,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
         public int TimeoutSeconds { get; set; } = 180;
         public double MinimumConfidence { get; set; } = 0.95;
         public int MaxRequestCharacters { get; set; } = 180000;
+        public int StageRequestCharacters { get; set; } = 18000;
+        public int StageFileCount { get; set; } = 8;
 
         public void Validate()
         {
@@ -36,7 +38,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             if (TimeoutSeconds < 1 || TimeoutSeconds > 1800 ||
                 !double.IsFinite(MinimumConfidence) || MinimumConfidence < 0 || MinimumConfidence > 1 ||
-                MaxRequestCharacters < 1000 || MaxRequestCharacters > 1000000 || MaxOutputTokens < 64 || MaxOutputTokens > 32768)
+                MaxRequestCharacters < 1000 || MaxRequestCharacters > 1000000 || MaxOutputTokens < 64 || MaxOutputTokens > 32768 ||
+                StageRequestCharacters < 1000 || StageRequestCharacters > 1000000 || StageFileCount < 1 || StageFileCount > 32)
             {
                 throw new ArgumentException("Invalid AI timeout, confidence, or request size setting");
             }
@@ -69,7 +72,9 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 Automatic = mode.Equals("Automatic", StringComparison.OrdinalIgnoreCase),
                 TimeoutSeconds = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_TIMEOUT_SECONDS") ?? "180", CultureInfo.InvariantCulture),
                 MinimumConfidence = double.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MIN_CONFIDENCE") ?? "0.95", CultureInfo.InvariantCulture),
-                MaxRequestCharacters = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MAX_REQUEST_CHARACTERS") ?? "180000", CultureInfo.InvariantCulture)
+                MaxRequestCharacters = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MAX_REQUEST_CHARACTERS") ?? "180000", CultureInfo.InvariantCulture),
+                StageRequestCharacters = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_STAGE_CHARACTERS") ?? "18000", CultureInfo.InvariantCulture),
+                StageFileCount = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_STAGE_FILES") ?? "8", CultureInfo.InvariantCulture)
             };
             settings.Validate();
             return settings;
