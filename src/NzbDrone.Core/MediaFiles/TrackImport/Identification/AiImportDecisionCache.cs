@@ -152,7 +152,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             file.AiMatch = new AiMatchResult
             {
                 IsCached = true,
-                Reason = "No current saved AI result. Use Queue Refresh or select files and click Map Tracks to request matching."
+                Reason = "No current saved AI result. Use Retry AI in the Queue or select files and click Map Tracks to request matching."
             };
             return new ImportDecision<LocalTrack>(file, new Rejection(file.AiMatch.Reason));
         }

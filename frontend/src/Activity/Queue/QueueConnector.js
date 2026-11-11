@@ -5,7 +5,7 @@ import { createSelector } from 'reselect';
 import * as commandNames from 'Commands/commandNames';
 import withCurrentPage from 'Components/withCurrentPage';
 import { clearAlbums, fetchAlbums } from 'Store/Actions/albumActions';
-import { executeCommand } from 'Store/Actions/commandActions';
+import { executeCommand, executeCommandHelper } from 'Store/Actions/commandActions';
 import * as queueActions from 'Store/Actions/queueActions';
 import { createCustomFiltersSelector } from 'Store/Selectors/createClientSideCollectionSelector';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
@@ -23,7 +23,8 @@ function createMapStateToProps() {
     (state) => state.queue.status.item,
     createCustomFiltersSelector('queue'),
     createCommandExecutingSelector(commandNames.REFRESH_MONITORED_DOWNLOADS),
-    (artist, albums, options, queue, status, customFilters, isRefreshMonitoredDownloadsExecuting) => {
+    createCommandExecutingSelector(commandNames.RETRY_AI_MATCHES),
+    (artist, albums, options, queue, status, customFilters, isRefreshMonitoredDownloadsExecuting, isRetryAiMatchesExecuting) => {
       return {
         count: options.includeUnknownArtistItems ? status.totalCount : status.count,
         isArtistFetching: artist.isFetching,
@@ -33,6 +34,7 @@ function createMapStateToProps() {
         albumsError: albums.error,
         customFilters,
         isRefreshMonitoredDownloadsExecuting,
+        isRetryAiMatchesExecuting,
         ...options,
         ...queue
       };
@@ -44,15 +46,24 @@ const mapDispatchToProps = {
   ...queueActions,
   fetchAlbums,
   clearAlbums,
-  executeCommand
+  executeCommand,
+  queueRetryAi: (payload) => (dispatch) => executeCommandHelper(payload, dispatch)
 };
 
 class QueueConnector extends Component {
+
+  constructor(props, context) {
+    super(props, context);
+    this.state = { isQueueingAiRetry: false, aiRetryError: false };
+    this._retryPending = false;
+    this._isMounted = false;
+  }
 
   //
   // Lifecycle
 
   componentDidMount() {
+    this._isMounted = true;
     const {
       useCurrentPage,
       fetchQueue,
@@ -91,6 +102,7 @@ class QueueConnector extends Component {
   }
 
   componentWillUnmount() {
+    this._isMounted = false;
     unregisterPagePopulator(this.repopulate);
     this.props.clearQueue();
     this.props.clearAlbums();
@@ -145,8 +157,29 @@ class QueueConnector extends Component {
   onRefreshPress = () => {
     this.props.executeCommand({
       name: commandNames.REFRESH_MONITORED_DOWNLOADS,
-      retryAiMatching: true
+      queueOnly: true
     });
+  };
+
+  onRetryAiPress = async() => {
+    if (this._retryPending || this.props.isRetryAiMatchesExecuting) {
+      return;
+    }
+
+    this._retryPending = true;
+    this.setState({ isQueueingAiRetry: true, aiRetryError: false });
+    try {
+      await this.props.queueRetryAi({ name: commandNames.RETRY_AI_MATCHES });
+    } catch {
+      if (this._isMounted) {
+        this.setState({ aiRetryError: true });
+      }
+    } finally {
+      this._retryPending = false;
+      if (this._isMounted) {
+        this.setState({ isQueueingAiRetry: false });
+      }
+    }
   };
 
   onGrabSelectedPress = (ids) => {
@@ -172,9 +205,12 @@ class QueueConnector extends Component {
         onFilterSelect={this.onFilterSelect}
         onTableOptionChange={this.onTableOptionChange}
         onRefreshPress={this.onRefreshPress}
+        onRetryAiPress={this.onRetryAiPress}
         onGrabSelectedPress={this.onGrabSelectedPress}
         onRemoveSelectedPress={this.onRemoveSelectedPress}
         {...this.props}
+        isRetryAiMatchesExecuting={this.state.isQueueingAiRetry || this.props.isRetryAiMatchesExecuting}
+        aiRetryError={this.state.aiRetryError}
       />
     );
   }
@@ -199,7 +235,9 @@ QueueConnector.propTypes = {
   removeQueueItems: PropTypes.func.isRequired,
   fetchAlbums: PropTypes.func.isRequired,
   clearAlbums: PropTypes.func.isRequired,
-  executeCommand: PropTypes.func.isRequired
+  executeCommand: PropTypes.func.isRequired,
+  queueRetryAi: PropTypes.func.isRequired,
+  isRetryAiMatchesExecuting: PropTypes.bool.isRequired
 };
 
 export default withCurrentPage(

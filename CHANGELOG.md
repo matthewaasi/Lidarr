@@ -2,6 +2,15 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.4 — Dedicated AI retry and quieter provider warnings
+
+- Added Retry AI beside Queue Refresh with independent command progress and duplicate-submission guards.
+- Restored Refresh to polling and list updates without requesting identification or starting an import-processing worker.
+- Kept Manual Import saved-result-only on opening; explicit mapping still performs identification.
+- Reduced unavailable-provider warnings, including DeemixSettings, to one actionable message per entry/settings type per process while retaining configuration and credentials.
+
+**Recorded verification:** 57 backend and 15 frontend tests passed.
+
 ## 3.2.1.5196-ai.3 — Saved AI previews and explicit retry
 
 - Opening Manual Import now reads saved AI proposals without making an inference request; explicit Map Tracks still requests fresh identification.

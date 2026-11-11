@@ -1,9 +1,9 @@
-# Features — 3.2.1.5196-ai.3
+# Features — 3.2.1.5196-ai.4
 
 - LM Studio album/track identification with Review and Automatic modes, strict result validation and configurable request settings.
 - Native release-type search buttons on artist pages.
 - Persistent saved AI decisions for Manual Import previews, with explicit fresh mapping.
-- Queue Refresh explicitly retries held matching in this historical release; ai.4 replaces this with a separate action.
+- Retry AI is separate from Refresh; unavailable-provider warning spam is suppressed without deleting configuration.
 
 ## Compatibility
 
@@ -12,5 +12,4 @@
 - Back up appdata and any external PostgreSQL databases before upgrading; rollback across migrations can require a database restore. Historical releases can lack later fixes and should not be used as a casual downgrade path.
 - Known historical limitation: the strict missing-track safeguard and red/yellow AI error classification were added in ai.5.
 - Known historical limitation: staged AI requests were added in ai.6; large prompts in this version can exceed the model context.
-- Queue Refresh retries matching in ai.3. Later releases separate that operation from list refresh.
 - Test counts describe each original build’s recorded verification, not a fresh rerun during this repository reorganization. Linux container execution and third-party plugin behavior require runtime verification.

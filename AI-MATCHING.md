@@ -1,4 +1,4 @@
-# Lidarr AI Matcher — 3.2.1.5196-ai.3
+# Lidarr AI Matcher — 3.2.1.5196-ai.4
 
 Based on upstream `Lidarr/Lidarr` tag `v3.2.1.5196`, commit `6af1274a11957270a308fd0448ffe624a8e264d0`.
 The container uses LinuxServer's `nightly-3.2.1.5196-ls224` runtime and s6 startup.
@@ -42,7 +42,7 @@ Manual Import's review popover shows the explanation and candidate releases. The
 On an x86-64 Docker host, from this source directory:
 
 ```sh
-docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.3 .
+docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.4 .
 ```
 
 The multi-stage Dockerfile builds the UI with Node 22/Yarn 1.22.22 and publishes the application plus the dynamically loaded `Lidarr.Mono` platform library with .NET SDK 8.0.421 for `linux-musl-x64`.
@@ -67,10 +67,18 @@ Focused UI tests can be run after installing the frontend dependencies:
 node --test frontend/test/releaseTypeSearch.test.cjs
 ```
 
-## Queue retry and saved Manual Import previews (ai.3)
+## Queue actions and saved Manual Import previews (ai.4)
 
-Clicking **Refresh** on Activity → Queue sends `RefreshMonitoredDownloads` with `retryAiMatching=true`. Completed downloads held in `ImportFailed` (including Review mode and prior LM Studio failures) are rearmed and processed through the normal identification/import pipeline. Imported, ignored, failed-download, and currently importing items are not rearmed. Background/scheduled queue refreshes do not set the retry flag. In Automatic mode a successful retry can proceed to import under the usual safeguards; in Review mode it remains held for approval.
+**Refresh** on Activity → Queue now sends `RefreshMonitoredDownloads` with `queueOnly=true`: it polls download clients and updates the list without checking imports or queueing an import-processing worker. Normal background handling still processes newly completed downloads independently.
+
+The separate **Retry AI** button beside Refresh sends `RetryAiMatches`. It refreshes the tracked downloads, rearms eligible completed import failures (including Review holds and prior LM Studio failures), and runs the normal matching/import pipeline for completed downloads awaiting import. It covers the queue across filters, not just selected rows. Imported, ignored, failed-download, and currently importing items are not rearmed. Background/scheduled polling does not force retries of held imports. Completed Download Handling must be enabled. In Automatic mode a successful retry can proceed to import under the usual safeguards; Review mode still holds the result for approval. The button's spinner follows the dedicated command through processing; duplicate clicks and duplicate active commands are guarded.
 
 Opening **Manual Import** for a folder or download only reads the latest saved per-file results. It never falls back to inference if a result is missing. **Map Tracks** remains an explicit fresh identification operation. Existing POST-based mapping edits retain their fresh-identification behavior; opening/browsing the dialog is the operation changed here.
 
-Results and original rejection reasons are saved atomically to `/config/ai-import-decisions.json`, retaining up to 5000 recent file entries. A size/mtime change or missing/cross-release metadata invalidates a saved proposal. Preview never uses saved mappings for automatic importing. If no valid saved result exists, the dialog says to use Queue Refresh or Map Tracks. The review popover identifies saved results. This cache persists across restarts and does not store API credentials or raw audio. Entries from earlier builds are not reconstructed from audit logs; run Queue Refresh once after upgrading to create saved results for held downloads.
+Results and original rejection reasons are saved atomically to `/config/ai-import-decisions.json`, retaining up to 5000 recent file entries. A size/mtime change or missing/cross-release metadata invalidates a saved proposal. Preview never uses saved mappings for automatic importing. If no valid saved result exists, use Retry AI or Map Tracks. The review popover identifies saved results. This cache persists across restarts and does not store API credentials or raw audio. Entries from builds before ai.3 are not reconstructed from audit logs; use Retry AI once to create saved results for held downloads if needed.
+
+## Unavailable provider warnings (ai.4)
+
+`DownloadClientRepository` reads a persisted download-client row whose `ConfigContract` names the provider settings class. The warning about `DeemixSettings` means that class is unavailable in the loaded assemblies (for example, an old Deemix configuration whose plugin is no longer installed or failed to load). The provider was already being skipped; this is independent of the AI matcher.
+
+The repository now logs one actionable warning per unavailable entry/settings type per process instead of on every poll. It includes the name and ID and preserves the database row, enable state, settings, and credentials. A returning provider clears the suppression for that same entry. Other provider errors are not suppressed. This avoids deleting a potentially recoverable plugin configuration. Restoring the matching provider/plugin, or removing a verified obsolete database entry while Lidarr is stopped and backed up, resolves the underlying configuration issue completely. The supplied diagnostic SQL only lists the Deemix entry and does not expose its settings or modify it.

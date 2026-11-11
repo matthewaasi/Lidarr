@@ -165,7 +165,10 @@ class Queue extends Component {
       isGrabbing,
       isRemoving,
       isRefreshMonitoredDownloadsExecuting,
+      isRetryAiMatchesExecuting,
+      aiRetryError,
       onRefreshPress,
+      onRetryAiPress,
       onFilterSelect,
       ...otherProps
     } = this.props;
@@ -195,6 +198,15 @@ class Queue extends Component {
               iconName={icons.REFRESH}
               isSpinning={isRefreshing}
               onPress={onRefreshPress}
+            />
+
+            <PageToolbarButton
+              label={translate('RetryAi')}
+              title={translate('RetryAiHelpText')}
+              iconName={icons.SEARCH}
+              isSpinning={isRetryAiMatchesExecuting}
+              isDisabled={count === 0 || isRefreshMonitoredDownloadsExecuting}
+              onPress={onRetryAiPress}
             />
 
             <PageToolbarSeparator />
@@ -240,6 +252,8 @@ class Queue extends Component {
             />
           </PageToolbarSection>
         </PageToolbar>
+
+        {aiRetryError ? <Alert kind={kinds.DANGER}>{translate('RetryAiFailed')}</Alert> : null}
 
         <PageContentBody>
           {
@@ -364,6 +378,9 @@ Queue.propTypes = {
   isGrabbing: PropTypes.bool.isRequired,
   isRemoving: PropTypes.bool.isRequired,
   isRefreshMonitoredDownloadsExecuting: PropTypes.bool.isRequired,
+  isRetryAiMatchesExecuting: PropTypes.bool.isRequired,
+  aiRetryError: PropTypes.bool.isRequired,
+  onRetryAiPress: PropTypes.func.isRequired,
   onRefreshPress: PropTypes.func.isRequired,
   onGrabSelectedPress: PropTypes.func.isRequired,
   onRemoveSelectedPress: PropTypes.func.isRequired,

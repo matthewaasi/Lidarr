@@ -95,7 +95,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             var result = _cache.Read(new List<LocalTrack> { PreviewFile() }).Single();
             Assert.That(result.Item.Tracks, Is.Empty);
             Assert.That(result.Item.AiMatch.Proposed, Is.False);
-            Assert.That(result.Rejections.Single().Reason, Does.Contain("Queue Refresh"));
+            Assert.That(result.Rejections.Single().Reason, Does.Contain("Retry AI"));
         }
 
         [TestCase(true)]

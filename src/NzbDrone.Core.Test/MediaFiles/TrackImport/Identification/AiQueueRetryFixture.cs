@@ -19,7 +19,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
         [TestCase(true, TrackedDownloadState.Ignored, DownloadItemStatus.Completed, false)]
         [TestCase(true, TrackedDownloadState.Importing, DownloadItemStatus.Completed, false)]
         [TestCase(true, TrackedDownloadState.ImportFailed, DownloadItemStatus.Downloading, false)]
-        public void explicit_refresh_should_retry_only_eligible_failed_imports(bool explicitRetry, TrackedDownloadState state, DownloadItemStatus status, bool expectedCheck)
+        public void retry_ai_should_retry_only_eligible_failed_imports(bool explicitRetry, TrackedDownloadState state, DownloadItemStatus status, bool expectedCheck)
         {
             var client = new Mock<IDownloadClient>();
             var factory = new Mock<IDownloadClientFactory>();
@@ -32,6 +32,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             client.Setup(c => c.GetItems()).Returns(new[] { item });
             factory.Setup(f => f.DownloadHandlingEnabled(true)).Returns(new List<IDownloadClient> { client.Object });
             tracked.Setup(t => t.TrackDownload(It.IsAny<DownloadClientDefinition>(), item)).Returns(download);
+            tracked.Setup(t => t.GetTrackedDownloads()).Returns(new List<TrackedDownload> { download });
             config.SetupGet(c => c.EnableCompletedDownloadHandling).Returns(true);
             var service = new DownloadMonitoringService(
                 new Mock<IDownloadClientStatusService>().Object,
@@ -44,7 +45,14 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
                 tracked.Object,
                 LogManager.GetLogger("queue-test"));
 
-            service.Execute(new RefreshMonitoredDownloadsCommand { RetryAiMatching = explicitRetry });
+            if (explicitRetry)
+            {
+                service.Execute(new RetryAiMatchesCommand());
+            }
+            else
+            {
+                service.Execute(new RefreshMonitoredDownloadsCommand { QueueOnly = true });
+            }
 
             completed.Verify(c => c.Check(download), expectedCheck ? Times.Once() : Times.Never());
             if (expectedCheck)

@@ -213,8 +213,8 @@ test('UI disables empty/busy sections and renders queue failures as an alert', (
   }
 });
 
-test('Queue Refresh explicitly requests AI retry rather than just scheduled polling', () => {
-  const QueueConnector = load('Activity/Queue/QueueConnector.js', {
+function loadQueueConnector() {
+  return load('Activity/Queue/QueueConnector.js', {
     'react-redux': { connect: () => (component) => component },
     'Commands/commandNames': names,
     'Components/withCurrentPage': (component) => component,
@@ -228,8 +228,89 @@ test('Queue Refresh explicitly requests AI retry rather than just scheduled poll
     'Utilities/pagePopulator': {},
     './Queue': stub
   }).default;
+}
+
+test('Queue Refresh only refreshes list state without requesting AI retry', () => {
+  const QueueConnector = loadQueueConnector();
   let sent;
   new QueueConnector({ executeCommand: (payload) => { sent = payload; } }).onRefreshPress();
   assert.equal(sent.name, names.REFRESH_MONITORED_DOWNLOADS);
-  assert.equal(sent.retryAiMatching, true);
+  assert.equal(sent.queueOnly, true);
+  assert.equal(sent.retryAiMatching, undefined);
+});
+
+function queueInstance(queueRetryAi, running = false) {
+  const QueueConnector = loadQueueConnector();
+  const instance = new QueueConnector({ queueRetryAi, isRetryAiMatchesExecuting: running });
+  instance._isMounted = true;
+  instance.setState = (update) => Object.assign(instance.state, update);
+  return instance;
+}
+
+test('Retry AI sends a dedicated command and immediately guards against duplicate clicks', async () => {
+  let finish;
+  const payloads = [];
+  const instance = queueInstance((payload) => {
+    payloads.push(payload);
+    return new Promise((resolve) => { finish = resolve; });
+  });
+  const pending = instance.onRetryAiPress();
+  await instance.onRetryAiPress();
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].name, names.RETRY_AI_MATCHES);
+  assert.equal(instance.state.isQueueingAiRetry, true);
+  finish();
+  await pending;
+  assert.equal(instance.state.isQueueingAiRetry, false);
+});
+
+test('running Retry AI cannot be queued again; failed submissions show a retryable error', async () => {
+  let calls = 0;
+  await queueInstance(() => { calls++; }, true).onRetryAiPress();
+  assert.equal(calls, 0);
+  const instance = queueInstance(async () => { throw Error('HTTP 503'); });
+  await instance.onRetryAiPress();
+  assert.equal(instance.state.aiRetryError, true);
+  assert.equal(instance.state.isQueueingAiRetry, false);
+  instance.props.queueRetryAi = async () => {};
+  await instance.onRetryAiPress();
+  assert.equal(instance.state.aiRetryError, false);
+});
+
+test('Queue toolbar places Retry AI immediately after Refresh and tracks its own spinner', () => {
+  const toolbarButton = () => null;
+  const queue = load('Activity/Queue/Queue.js', {
+    'Components/Alert': stub,
+    'Components/Loading/LoadingIndicator': stub,
+    'Components/Menu/FilterMenu': stub,
+    'Components/Page/PageContent': stub,
+    'Components/Page/PageContentBody': stub,
+    'Components/Page/Toolbar/PageToolbar': stub,
+    'Components/Page/Toolbar/PageToolbarButton': toolbarButton,
+    'Components/Page/Toolbar/PageToolbarSection': stub,
+    'Components/Page/Toolbar/PageToolbarSeparator': stub,
+    'Components/Table/Table': stub,
+    'Components/Table/TableBody': stub,
+    'Components/Table/TableOptions/TableOptionsModalWrapper': stub,
+    'Components/Table/TablePager': stub,
+    'Helpers/Props': { ...nativeProps, align: {} },
+    'Utilities/Object/getRemovedItems': stub,
+    'Utilities/Object/hasDifferentItems': stub,
+    'Utilities/String/translate': (key) => key,
+    'Utilities/Table/getSelectedIds': () => [],
+    'Utilities/Table/removeOldSelectedState': stub,
+    'Utilities/Table/selectAll': stub,
+    'Utilities/Table/toggleSelected': stub,
+    './QueueFilterModal': stub,
+    './QueueOptionsConnector': stub,
+    './QueueRowConnector': stub,
+    './RemoveQueueItemModal': stub
+  }).default;
+  const buttons = nodes(new queue({
+    items: [], count: 2, totalRecords: 2, isPopulated: true,
+    isArtistPopulated: true, isAlbumsPopulated: true, isRetryAiMatchesExecuting: true
+  }).render()).filter((node) => node.type === toolbarButton);
+  assert.deepEqual(buttons.slice(0, 2).map((button) => button.props.label), ['Refresh', 'RetryAi']);
+  assert.equal(buttons[1].props.isSpinning, true);
+  assert.equal(Boolean(buttons[0].props.isSpinning), false);
 });
