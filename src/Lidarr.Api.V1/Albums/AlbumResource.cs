@@ -46,6 +46,19 @@ namespace Lidarr.Api.V1.Albums
 
     public static class AlbumResourceMapper
     {
+        public static AlbumResource ToSummaryResource(this Album model)
+        {
+            return model == null ? null : new AlbumResource
+            {
+                Id = model.Id,
+                ForeignAlbumId = model.ForeignAlbumId,
+                Title = model.Title,
+                Disambiguation = model.Disambiguation,
+                ReleaseDate = model.ReleaseDate,
+                Images = model.Images.JsonClone()
+            };
+        }
+
         public static AlbumResource ToResource(this Album model)
         {
             if (model == null)

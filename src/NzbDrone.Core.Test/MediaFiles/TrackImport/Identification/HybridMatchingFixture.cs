@@ -46,8 +46,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
                 .Returns(new List<CandidateAlbumRelease> { new CandidateAlbumRelease(_albumRelease) });
             var tracks = new Mock<ITrackService>();
             tracks.Setup(t => t.GetTracksByReleases(It.IsAny<List<int>>())).Returns(new List<Track>());
-            _service = new IdentificationService(tracks.Object, new Mock<ITrackGroupingService>().Object, new Mock<IFingerprintingService>().Object,
-                new Mock<IAudioTagService>().Object, new Mock<IAugmentingService>().Object, _candidates.Object, _config.Object, _lm.Object, LogManager.GetLogger("hybrid-test"));
+            _service = new IdentificationService(tracks.Object, new Mock<ITrackGroupingService>().Object, new Mock<IFingerprintingService>().Object, new Mock<IAudioTagService>().Object, new Mock<IAugmentingService>().Object, _candidates.Object, _config.Object, _lm.Object, LogManager.GetLogger("hybrid-test"));
         }
 
         private void GivenPolicyMatch(double albumDistance = 0, double trackDistance = 0)

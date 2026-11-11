@@ -62,15 +62,14 @@ const selectTrackFiles = createSelector(
   }
 );
 
-function createMapStateToProps() {
+export function createMapStateToProps() {
   return createSelector(
     (state, { foreignArtistId }) => foreignArtistId,
     selectAlbums,
     selectTrackFiles,
-    createAllArtistSelector(),
+    createSelector(createAllArtistSelector(), (artists) => _.orderBy(artists, 'sortName')),
     createCommandsSelector(),
-    (foreignArtistId, albums, trackFiles, allArtists, commands) => {
-      const sortedArtist = _.orderBy(allArtists, 'sortName');
+    (foreignArtistId, albums, trackFiles, sortedArtist, commands) => {
       const artistIndex = _.findIndex(sortedArtist, { foreignArtistId });
       const artist = sortedArtist[artistIndex];
 
@@ -88,8 +87,6 @@ function createMapStateToProps() {
       } = albums;
 
       const {
-        isTrackFilesFetching,
-        isTrackFilesPopulated,
         trackFilesError,
         hasTrackFiles
       } = trackFiles;
@@ -113,8 +110,9 @@ function createMapStateToProps() {
         isRenamingArtistCommand.body.artistIds.indexOf(artist.id) > -1
       );
 
-      const isFetching = isAlbumsFetching || isTrackFilesFetching;
-      const isPopulated = isAlbumsPopulated && isTrackFilesPopulated;
+      // File-management tools can finish loading without hiding the album list.
+      const isFetching = isAlbumsFetching;
+      const isPopulated = isAlbumsPopulated;
 
       const alternateTitles = _.reduce(artist.alternateTitles, (acc, alternateTitle) => {
         if ((alternateTitle.seasonNumber === -1 || alternateTitle.seasonNumber === undefined) &&

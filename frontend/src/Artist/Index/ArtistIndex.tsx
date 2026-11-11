@@ -78,6 +78,10 @@ interface ArtistIndexProps {
 }
 
 const ArtistIndex = withScrollPosition((props: ArtistIndexProps) => {
+  const selectArtistCollection = useMemo(
+    () => createArtistClientSideCollectionItemsSelector('artistIndex'),
+    []
+  );
   const {
     isFetching,
     isPopulated,
@@ -92,7 +96,7 @@ const ArtistIndex = withScrollPosition((props: ArtistIndexProps) => {
     sortDirection,
     view,
   }: ArtistAppState & ArtistIndexAppState & ClientSideCollectionAppState =
-    useSelector(createArtistClientSideCollectionItemsSelector('artistIndex'));
+    useSelector(selectArtistCollection);
 
   const isRssSyncExecuting = useSelector(
     createCommandExecutingSelector(RSS_SYNC)

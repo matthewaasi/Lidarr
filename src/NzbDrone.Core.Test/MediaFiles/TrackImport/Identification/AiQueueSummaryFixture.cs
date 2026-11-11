@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using NzbDrone.Core.MediaFiles.TrackImport.Identification;
 
@@ -29,7 +30,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
         public void no_saved_assessment_is_not_approved()
         {
             Assert.That(AiQueueSummary.Get(new[] { new AiMatchResult { IsCached = true } }), Is.Null);
-            Assert.That(AiQueueSummary.Get(new AiMatchResult[0]), Is.Null);
+            Assert.That(AiQueueSummary.Get(Array.Empty<AiMatchResult>()), Is.Null);
         }
     }
 }

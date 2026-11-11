@@ -247,7 +247,11 @@ function getSaveAjaxOptions({ ajaxOptions, payload }) {
 
 export const actionHandlers = handleThunks({
 
-  [FETCH_ARTIST]: createFetchHandler(section, '/artist'),
+  [FETCH_ARTIST]: (getState, payload, dispatch) => createFetchHandler(section, '/artist')(
+    getState,
+    { includeAlbumDetails: false, ...payload },
+    dispatch
+  ),
   [SAVE_ARTIST]: createSaveProviderHandler(section, '/artist', { getAjaxOptions: getSaveAjaxOptions }),
   [DELETE_ARTIST]: createRemoveItemHandler(section, '/artist'),
 

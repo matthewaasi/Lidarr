@@ -17,19 +17,24 @@ RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net8
     -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=3.2.1.5196 -p:AssemblyConfiguration=nightly-ai -o /out
 
 FROM ghcr.io/linuxserver/lidarr:nightly-3.2.1.5196-ls224@sha256:d1e3b469e618fa54b56bc487442efc231142096db3188cd3a4d5b1393b919e5e
-RUN rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin
+ARG FORK_VERSION=3.2.1.5196-ai.11
+ARG VCS_REF=unknown
+RUN cp /app/lidarr/bin/fpcalc /tmp/lidarr-fpcalc \
+    && rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin \
+    && mv /tmp/lidarr-fpcalc /app/lidarr/bin/fpcalc
 COPY --from=backend /out/ /app/lidarr/bin/
 COPY --from=frontend /src/_output/UI/ /app/lidarr/bin/UI/
 COPY LICENSE.md /app/lidarr/bin/LICENSE.md
 COPY LICENSES/ /app/lidarr/bin/LICENSES/
 RUN chmod 755 /app/lidarr/bin/Lidarr \
-    && printf 'UpdateMethod=docker\nBranch=nightly\nPackageVersion=3.2.1.5196-ai.10\nPackageAuthor=Lidarr AI local fork\n' > /app/lidarr/package_info
+    && printf 'UpdateMethod=docker\nBranch=nightly\nPackageVersion=%s\nPackageAuthor=Lidarr AI local fork\n' "$FORK_VERSION" > /app/lidarr/package_info
 ENV LIDARR_AI_MODE=Review \
     LIDARR_AI_BASE_URL=http://10.0.0.88:1234/v1 \
     LIDARR_AI_MODEL=qwen/qwen3.8-27b
 LABEL org.opencontainers.image.title="Lidarr AI Matcher" \
-      org.opencontainers.image.version="3.2.1.5196-ai.10" \
-      org.opencontainers.image.revision="0ca4151f5+ai.10" \
+      org.opencontainers.image.version="${FORK_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/matthewaasi/Lidarr" \
       org.opencontainers.image.licenses="GPL-3.0"
 EXPOSE 8686
 VOLUME /config

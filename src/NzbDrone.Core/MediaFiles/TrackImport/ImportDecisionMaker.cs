@@ -232,6 +232,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
             {
                 _aiDecisionCache.Save(decisions);
             }
+
             return decisions;
         }
 

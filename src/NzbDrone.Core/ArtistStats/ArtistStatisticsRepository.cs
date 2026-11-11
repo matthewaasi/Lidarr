@@ -41,11 +41,12 @@ namespace NzbDrone.Core.ArtistStats
                 Query(TrackFilesBuilder().Where<Artist>(x => x.Id == artistId), _selectTrackFilesTemplate));
         }
 
-        private List<AlbumStatistics> MapResults(List<AlbumStatistics> tracksResult, List<AlbumStatistics> filesResult)
+        internal static List<AlbumStatistics> MapResults(List<AlbumStatistics> tracksResult, List<AlbumStatistics> filesResult)
         {
+            var filesByAlbum = filesResult.ToLookup(f => (f.ArtistId, f.AlbumId));
             tracksResult.ForEach(e =>
             {
-                var file = filesResult.SingleOrDefault(f => f.ArtistId == e.ArtistId & f.AlbumId == e.AlbumId);
+                var file = filesByAlbum[(e.ArtistId, e.AlbumId)].SingleOrDefault();
 
                 e.SizeOnDisk = file?.SizeOnDisk ?? 0;
             });

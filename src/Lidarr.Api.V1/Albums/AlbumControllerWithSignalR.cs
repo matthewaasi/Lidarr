@@ -72,7 +72,15 @@ namespace Lidarr.Api.V1.Albums
                 }
             }
 
-            var artistStats = _artistStatisticsService.ArtistStatistics();
+            var artistIds = result.Select(x => x.ArtistId).Distinct().ToList();
+            if (artistIds.Count == 0)
+            {
+                return result;
+            }
+
+            var artistStats = artistIds.Count == 1
+                ? new List<ArtistStatistics> { _artistStatisticsService.ArtistStatistics(artistIds[0]) }
+                : _artistStatisticsService.ArtistStatistics();
             LinkArtistStatistics(result, artistStats);
             MapCoversToLocal(result.ToArray());
 
@@ -86,10 +94,14 @@ namespace Lidarr.Api.V1.Albums
 
         private void LinkArtistStatistics(List<AlbumResource> resources, List<ArtistStatistics> artistStatistics)
         {
+            var albumStats = artistStatistics
+                .Where(x => x?.AlbumStatistics != null)
+                .SelectMany(x => x.AlbumStatistics.Select(album => new { x.ArtistId, Album = album }))
+                .ToDictionary(x => (x.ArtistId, x.Album.AlbumId), x => x.Album);
+
             foreach (var album in resources)
             {
-                var stats = artistStatistics.SingleOrDefault(ss => ss.ArtistId == album.ArtistId);
-                LinkArtistStatistics(album, stats);
+                album.Statistics = albumStats.GetValueOrDefault((album.ArtistId, album.Id)).ToResource();
             }
         }
 

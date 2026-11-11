@@ -1,0 +1,337 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using Newtonsoft.Json;
+using NLog;
+using NzbDrone.Common.Disk;
+using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.Exceptions;
+using NzbDrone.Core.Messaging.Commands;
+using NzbDrone.Core.Music;
+using NzbDrone.Core.Parser;
+using NzbDrone.Core.Parser.Model;
+
+namespace NzbDrone.Core.MediaFiles.LibraryAudit
+{
+    public interface ILibraryAuditService
+    {
+        List<LibraryAuditFinding> Findings();
+        void Decide(int id, string evidenceKey, string action);
+    }
+
+    public class LibraryAuditService : ILibraryAuditService, IExecute<ScanLibraryAuditCommand>
+    {
+        private readonly IMediaFileRepository _files;
+        private readonly ITrackService _tracks;
+        private readonly IAudioTagService _tags;
+        private readonly IDiskProvider _disk;
+        private readonly ILibraryAuditRepository _repository;
+        private readonly Logger _logger;
+        private readonly IFingerprintingService _fingerprints;
+        private readonly object _gate = new object();
+
+        public LibraryAuditService(IMediaFileRepository files, ITrackService tracks, IAudioTagService tags, IDiskProvider disk, ILibraryAuditRepository repository, IFingerprintingService fingerprints, Logger logger)
+        {
+            _files = files;
+            _tracks = tracks;
+            _tags = tags;
+            _disk = disk;
+            _repository = repository;
+            _logger = logger;
+            _fingerprints = fingerprints;
+        }
+
+        public List<LibraryAuditFinding> Findings() => _repository.All().OrderByDescending(x => x.Updated).ThenBy(x => x.Id).ToList();
+
+        public void Decide(int id, string evidenceKey, string action)
+        {
+            if (action != "ignore" && action != "restore")
+            {
+                throw new BadRequestException("Choose ignore or restore.");
+            }
+
+            lock (_gate)
+            {
+                var row = _repository.Get(id);
+                if (row.EvidenceKey != evidenceKey || row.Status == "resolved")
+                {
+                    throw new BadRequestException("This finding has changed. Refresh the audit before reviewing it.");
+                }
+
+                row.Status = action == "ignore" ? "ignored" : "pending";
+                _repository.Update(row);
+            }
+        }
+
+        public void Execute(ScanLibraryAuditCommand message)
+        {
+            if (!message.Versions && !message.Duplicates)
+            {
+                throw new BadRequestException("Select at least one audit scan type.");
+            }
+
+            if (message.Fingerprints && (!message.Versions || !_fingerprints.IsSetup()))
+            {
+                throw new BadRequestException("Fingerprint checks require Version audit and a working fpcalc installation.");
+            }
+
+            var findings = new List<LibraryAuditFinding>();
+            var files = _files.All().OrderBy(x => x.Id).ToList();
+            var snapshots = new Dictionary<int, AuditFile>();
+            var catalog = new Dictionary<int, List<Track>>();
+            var versionFailures = new HashSet<int>();
+            var duplicateFailures = new HashSet<int>();
+            _logger.ProgressInfo("Library audit: inspecting {0} files", files.Count);
+
+            foreach (var file in files)
+            {
+                var snapshot = Describe(file);
+                try
+                {
+                    snapshot.Size = _disk.GetFileSize(file.Path);
+                    snapshot.Modified = _disk.FileGetLastWrite(file.Path).ToUniversalTime();
+                    var duplicateSnapshot = Describe(file);
+                    duplicateSnapshot.Size = snapshot.Size;
+                    duplicateSnapshot.Modified = snapshot.Modified;
+                    snapshots.Add(file.Id, duplicateSnapshot);
+                    if (!message.Versions)
+                    {
+                        continue;
+                    }
+
+                    var tags = _tags.ReadTags(file.Path);
+                    if (tags == null)
+                    {
+                        throw new IOException("No readable audio metadata was returned.");
+                    }
+
+                    snapshot.TagTitle = tags.Title;
+                    snapshot.DurationSeconds = tags.Duration.TotalSeconds;
+                    var artistId = file.Artist?.Value?.Id ?? 0;
+                    if (!catalog.TryGetValue(artistId, out var artistTracks))
+                    {
+                        artistTracks = artistId > 0 ? _tracks.GetTracksByArtist(artistId) : new List<Track>();
+                        catalog.Add(artistId, artistTracks);
+                    }
+
+                    // Multi-track files do not have a single comparable catalog duration/title.
+                    if (file.Tracks?.Value?.Count == 1)
+                    {
+                        if (message.Fingerprints)
+                        {
+                            _logger.ProgressInfo("Library audit: fingerprinting file {0} of {1}", snapshots.Count, files.Count);
+                            var local = new LocalTrack { Path = file.Path, ExistingFile = true };
+                            try
+                            {
+                                _fingerprints.Lookup(new List<LocalTrack> { local }, 0.9);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Debug(ex, "Library audit fingerprint lookup failed for {0}", file.Path);
+                            }
+
+                            snapshot.AudioRecordingIds = (local.AcoustIdResults ?? new List<string>()).OrderBy(x => x, StringComparer.Ordinal).ToList();
+                            snapshot.FingerprintStatus = snapshot.AudioRecordingIds.Count > 0 ? "Recording associations found" : "No confident result / lookup unavailable";
+                            if (snapshot.AudioRecordingIds.Count == 0)
+                            {
+                                versionFailures.Add(file.Id);
+                                findings.Add(Error("fingerprintError", snapshot, new IOException("No confident fingerprint result was returned. The recording may be absent from AcoustID, fpcalc may have failed, or the lookup may be unavailable. Local version checks still ran.")));
+                            }
+                        }
+
+                        EnsureUnchanged(snapshot);
+                        var evidence = VersionAudit.Evaluate(snapshot, artistTracks);
+                        if (evidence != null)
+                        {
+                            findings.Add(Finding("version", evidence));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    versionFailures.Add(file.Id);
+                    try
+                    {
+                        EnsureUnchanged(snapshot);
+                    }
+                    catch (Exception)
+                    {
+                        snapshots.Remove(file.Id);
+                    }
+
+                    if (!snapshots.ContainsKey(file.Id))
+                    {
+                        duplicateFailures.Add(file.Id);
+                    }
+
+                    findings.Add(Error(message.Versions ? "versionError" : "duplicateError", snapshot, ex));
+                    _logger.Debug(ex, "Library audit could not inspect {0}", file.Path);
+                }
+            }
+
+            if (message.Duplicates)
+            {
+                // Equal length is required for byte-identical files. Avoid reading unique sizes.
+                var groups = snapshots.Values.Where(x => x.Size > 0).GroupBy(x => x.Size).Where(x => x.Count() > 1).ToList();
+                var processed = 0;
+                foreach (var group in groups)
+                {
+                    var hashes = new Dictionary<string, List<AuditFile>>();
+                    foreach (var file in group)
+                    {
+                        try
+                        {
+                            EnsureUnchanged(file);
+                            using var stream = _disk.OpenReadStream(file.Path);
+                            var hash = Convert.ToHexString(SHA256.HashData(stream));
+                            EnsureUnchanged(file);
+                            if (!hashes.TryGetValue(hash, out var matches))
+                            {
+                                matches = new List<AuditFile>();
+                                hashes.Add(hash, matches);
+                            }
+
+                            matches.Add(file);
+                        }
+                        catch (Exception ex)
+                        {
+                            duplicateFailures.Add(file.Id);
+                            findings.Add(Error("duplicateError", file, ex));
+                            _logger.Debug(ex, "Library audit could not hash {0}", file.Path);
+                        }
+                    }
+
+                    foreach (var match in hashes.Where(x => x.Value.Count > 1))
+                    {
+                        var verified = new List<AuditFile>();
+                        foreach (var file in match.Value)
+                        {
+                            try
+                            {
+                                EnsureUnchanged(file);
+                                verified.Add(file);
+                            }
+                            catch (Exception ex)
+                            {
+                                duplicateFailures.Add(file.Id);
+                                findings.Add(Error("duplicateError", file, ex));
+                            }
+                        }
+
+                        if (verified.Count < 2)
+                        {
+                            continue;
+                        }
+
+                        findings.Add(Finding("duplicate", new AuditEvidence
+                        {
+                            Confidence = "exact",
+                            Reason = $"These files have identical complete-file SHA-256 hashes ({match.Key}). This proves identical file bytes, including tags; it does not identify the correct mix label.",
+                            SuggestedAction = "Review the album links before choosing which copies to retain. Audit never removes files or changes monitoring.",
+                            Files = verified.OrderBy(x => x.Id).ToList()
+                        }));
+                    }
+
+                    _logger.ProgressInfo("Library audit: checked {0} of {1} duplicate size groups", ++processed, groups.Count);
+                }
+            }
+
+            // Publish only after the scan completes. A failed scan must not resolve previous findings.
+            lock (_gate)
+            {
+                var existing = _repository.All().ToDictionary(x => x.EvidenceKey);
+                var seen = new HashSet<string>();
+                foreach (var finding in findings)
+                {
+                    if (!seen.Add(finding.EvidenceKey))
+                    {
+                        continue;
+                    }
+
+                    if (existing.TryGetValue(finding.EvidenceKey, out var previous))
+                    {
+                        previous.Status = previous.Status == "ignored" ? "ignored" : "pending";
+                        previous.Updated = finding.Updated;
+                        _repository.Update(previous);
+                    }
+                    else
+                    {
+                        _repository.Insert(finding);
+                    }
+                }
+
+                foreach (var old in existing.Values.Where(x => !seen.Contains(x.EvidenceKey) &&
+                    ((message.Versions && (x.Kind == "version" || x.Kind == "versionError" || (message.Fingerprints && x.Kind == "fingerprintError"))) ||
+                     (message.Duplicates && (x.Kind == "duplicate" || x.Kind == "duplicateError")))))
+                {
+                    var evidence = JsonConvert.DeserializeObject<AuditEvidence>(old.Evidence);
+                    if (!message.Fingerprints && old.Kind == "version" && evidence.Confidence == "supported")
+                    {
+                        continue;
+                    }
+
+                    var failures = old.Kind == "version" || old.Kind == "versionError" || old.Kind == "fingerprintError" ? versionFailures : duplicateFailures;
+                    if (evidence.Files.Any(x => failures.Contains(x.Id)))
+                    {
+                        continue;
+                    }
+
+                    old.Status = "resolved";
+                    _repository.Update(old);
+                }
+            }
+
+            _logger.ProgressInfo("Library audit finished: {0} findings. Review them under Library → Audit.", findings.Count);
+        }
+
+        private void EnsureUnchanged(AuditFile file)
+        {
+            if (_disk.GetFileSize(file.Path) != file.Size || _disk.FileGetLastWrite(file.Path).ToUniversalTime() != file.Modified)
+            {
+                throw new IOException("File changed during the scan; run the audit again.");
+            }
+        }
+
+        private static AuditFile Describe(TrackFile file)
+        {
+            var track = file.Tracks?.Value?.Count == 1 ? file.Tracks.Value[0] : null;
+            return new AuditFile
+            {
+                Id = file.Id,
+                Path = file.Path,
+                Size = file.Size,
+                Modified = file.Modified,
+                Artist = file.Artist?.Value?.Name,
+                ForeignArtistId = file.Artist?.Value?.ForeignArtistId,
+                ForeignAlbumId = file.Album?.Value?.ForeignAlbumId,
+                CatalogTitle = track?.Title,
+                CatalogDurationSeconds = (track?.Duration ?? 0) / 1000.0,
+                RecordingId = track?.ForeignRecordingId
+            };
+        }
+
+        private static LibraryAuditFinding Error(string kind, AuditFile file, Exception error) => Finding(kind, new AuditEvidence
+        {
+            Confidence = "unavailable",
+            Reason = $"Could not inspect this file: {error.Message}",
+            SuggestedAction = "Check that the file exists, permissions allow reading, and the audio is readable; then rescan.",
+            Files = new List<AuditFile> { file }
+        });
+
+        private static LibraryAuditFinding Finding(string kind, AuditEvidence evidence)
+        {
+            var json = JsonConvert.SerializeObject(evidence);
+            return new LibraryAuditFinding
+            {
+                EvidenceKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(kind + json))),
+                Kind = kind,
+                Status = "pending",
+                Evidence = json,
+                Updated = DateTime.UtcNow
+            };
+        }
+    }
+}

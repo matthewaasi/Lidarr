@@ -1,0 +1,20 @@
+services:
+  lidarr-ai:
+    image: lidarr-ai:3.2.1.5196-ai.11
+    pull_policy: never
+    container_name: lidarr-ai
+    environment:
+      PUID: "99"
+      PGID: "100"
+      TZ: America/Chicago
+      LIDARR_AI_BASE_URL: http://10.0.0.88:1234/v1
+      LIDARR_AI_MODEL: qwen/qwen3.8-27b
+      LIDARR_AI_MODE: Review
+    volumes:
+      - /mnt/user/appdata/lidarr-ai:/config
+      # Preserve your existing host AND container paths; these are examples.
+      - /mnt/user/music:/music
+      - /mnt/user/downloads:/downloads
+    ports:
+      - "8687:8686"
+    restart: unless-stopped

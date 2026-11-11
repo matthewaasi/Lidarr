@@ -24,6 +24,7 @@ using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Instrumentation;
 using NzbDrone.Core.Jobs;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MediaFiles.LibraryAudit;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Music.Singles;
@@ -60,6 +61,7 @@ namespace NzbDrone.Core.Datastore
 
             Mapper.Entity<Config>("Config").RegisterModel();
             Mapper.Entity<SingleDecision>("SinglesDecisions").RegisterModel();
+            Mapper.Entity<LibraryAuditFinding>("LibraryAuditFindings").RegisterModel();
 
             Mapper.Entity<RootFolder>("RootFolders").RegisterModel()
                   .Ignore(r => r.Accessible)

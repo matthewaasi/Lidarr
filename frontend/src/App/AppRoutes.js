@@ -11,6 +11,7 @@ import ArtistIndex from 'Artist/Index/ArtistIndex';
 import CalendarPageConnector from 'Calendar/CalendarPageConnector';
 import NotFound from 'Components/NotFound';
 import Switch from 'Components/Router/Switch';
+import LibraryAudit from 'Library/Audit/LibraryAudit';
 import AddNewItemConnector from 'Search/AddNewItemConnector';
 import CustomFormatSettingsPage from 'Settings/CustomFormats/CustomFormatSettingsPage';
 import DownloadClientSettingsConnector from 'Settings/DownloadClients/DownloadClientSettingsConnector';
@@ -142,6 +143,7 @@ function AppRoutes(props) {
       />
 
       <Route path="/activity/singles" component={SinglesReview} />
+      <Route path="/library/audit" component={LibraryAudit} />
       <Route path="/settings/identification" render={() => <FeatureSettings feature="identification" />} />
       <Route path="/settings/uniquesingles" render={() => <FeatureSettings feature="uniquesingles" />} />
 

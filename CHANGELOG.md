@@ -2,6 +2,17 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.11 — Library Audit and faster library pages
+
+- Added Library → Audit for read-only review of version-label and duration mismatches, optional fingerprint evidence, and exact duplicate files.
+- Exact duplicate checks group by file size and compare complete SHA-256 file hashes; optional deep checks use fpcalc/AcoustID rather than uploading music files.
+- Added persistent findings, paginated filters, evidence-aware ignore/restore actions and partial-scan handling; the audit does not delete, retag, remap, change monitoring or download music.
+- Added main-database migration 83 for persistent audit findings.
+- Indexed album/statistics lookups, added lightweight artist summaries for the web UI, preserved full API responses by default, and scoped album statistics to the requested artist.
+- Preserved memoized library selectors, cached navigation sorting, and displayed artist albums before track-file loading finishes. Local benchmarks are not a measured production speedup.
+
+**Recorded verification:** 129 tests passed: 84 core, 6 API and 39 frontend. Analyzers, clean production frontend build, isolated startup/migration/API checks and Docker archive validation passed.
+
 ## 3.2.1.5196-ai.10 — Native-first identification with AI fallback
 
 - Added the selectable Lidarr first, LM Studio fallback engine while preserving existing engine selections until changed in Settings.

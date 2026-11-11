@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.2.1.5196-ai.11 — Library Audit and faster library pages
+
+### Added
+
+- Added **Library → Audit** with version-label/duration checks, optional fpcalc/AcoustID evidence, and SHA-256 exact-file duplicate detection.
+- Added saved findings, evidence comparisons, type/status filters, pagination, and reversible ignore/restore decisions. Audit scans never modify music files, tags, assignments, or monitoring.
+- Added migration 83 for persistent audit findings on SQLite and PostgreSQL. Back up the main database before upgrading; PostgreSQL databases are separate from appdata.
+- Included Linux/AMD64 Docker-loadable image, Unraid template, Compose example, source archive, build metadata, and checksums.
+
+### Improved
+
+- Replaced the quadratic album/file-statistics merge with an indexed lookup while preserving results and duplicate-match checks.
+- Made web UI artist-list requests use lightweight last/next album summaries instead of nested artist and full release records. Existing API clients keep the full response by default.
+- Scoped single-artist album statistics to the requested artist and indexed response statistics/last-next lookups.
+- Preserved library selector memoization across renders, corrected collection equality checks, and avoided repeated artist/release navigation sorting on unrelated updates.
+- Display artist albums as soon as their data arrives, without waiting for track-file details. File-management controls and error reporting remain available.
+- Preserve fpcalc from the pinned LinuxServer base during source Docker builds so optional audio identification remains available.
+
+### Validation and limits
+
+- Production UI build, lint, analyzer-enabled .NET builds, 39 frontend tests, and 90 .NET tests passed.
+- The pre-upgrade live artist-list request measured 17.968 seconds initially and 4.075 seconds on repeat, with 26.2 MB JSON. Offline summary projection reduced consistently reserialized JSON by 55.8%; this is not an end-to-end live speedup claim.
+- Synthetic 20,000-album merge: 1,440.5 ms before versus 4.1 ms indexed, with identical results. See `docs/UI-PERFORMANCE.md` and `docs/LIBRARY-AUDIT.md`.
+- Deep fingerprinting depends on catalog coverage and working fpcalc; uncertain associations remain review evidence. Exact duplicate checks do not match differently tagged or encoded audio.
+
 ## 3.2.1.5196-ai.7 — Changes from upstream Lidarr v3.2.1.5196
 
 Based on upstream commit `6af1274a11957270a308fd0448ffe624a8e264d0`. This changelog describes the cumulative changes in the fork relative to that source, rather than the changes between individual fork builds.

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>lidarr-ai</Name>
+  <Repository>lidarr-ai:3.2.1.5196-ai.11</Repository>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <WebUI>http://[IP]:[PORT:8686]/</WebUI>
+  <Overview>Lidarr fork with Library Audit, faster library and artist pages, and native/LM Studio matching. Load the ai.11 Docker archive first. Preserve existing paths and PostgreSQL settings when upgrading.</Overview>
+  <Config Name="Web UI" Target="8686" Default="8687" Mode="tcp" Description="Lidarr web interface" Type="Port" Display="always" Required="true" Mask="false">8687</Config>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/lidarr-ai" Mode="rw" Description="Copied Lidarr appdata including plugins" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/lidarr-ai</Config>
+  <Config Name="Music" Target="/music" Default="/mnt/user/music" Mode="rw" Description="Match your existing container mapping" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/music</Config>
+  <Config Name="Downloads" Target="/downloads" Default="/mnt/user/downloads" Mode="rw" Description="Match your existing container mapping" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/downloads</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID" Type="Variable" Display="always" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID" Type="Variable" Display="always" Required="true" Mask="false">100</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Chicago" Mode="" Description="Timezone" Type="Variable" Display="always" Required="true" Mask="false">America/Chicago</Config>
+  <Config Name="LM Studio URL" Target="LIDARR_AI_BASE_URL" Default="http://10.0.0.88:1234/v1" Mode="" Description="LM Studio API base URL" Type="Variable" Display="always" Required="true" Mask="false">http://10.0.0.88:1234/v1</Config>
+  <Config Name="Model" Target="LIDARR_AI_MODEL" Default="qwen/qwen3.8-27b" Mode="" Description="Exact LM Studio model identifier" Type="Variable" Display="always" Required="true" Mask="false">qwen/qwen3.8-27b</Config>
+  <Config Name="AI mode" Target="LIDARR_AI_MODE" Default="Review" Mode="" Description="Review or Automatic" Type="Variable" Display="always" Required="true" Mask="false">Review</Config>
+  <Config Name="Minimum AI confidence" Target="LIDARR_AI_MIN_CONFIDENCE" Default="0.95" Mode="" Description="Estimated certainty, not title similarity" Type="Variable" Display="advanced" Required="true" Mask="false">0.95</Config>
+  <Config Name="AI timeout" Target="LIDARR_AI_TIMEOUT_SECONDS" Default="180" Mode="" Description="Seconds" Type="Variable" Display="advanced" Required="true" Mask="false">180</Config>
+  <Config Name="LM Studio API token" Target="LIDARR_AI_API_KEY" Default="" Mode="" Description="Only if LM Studio authentication is enabled" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

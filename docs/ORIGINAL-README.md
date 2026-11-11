@@ -1,5 +1,7 @@
 # Lidarr
 
+This fork's **3.2.1.5196-ai.11** release adds Library Audit and faster library/artist pages alongside the existing native and LM Studio identification features. See the [release downloads](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.11), [Unraid installation guide](distribution/unraid/README.md), [Audit guide](docs/LIBRARY-AUDIT.md), and [performance measurements](docs/UI-PERFORMANCE.md).
+
 [![Build Status](https://dev.azure.com/Lidarr/Lidarr/_apis/build/status/lidarr.Lidarr?branchName=develop)](https://dev.azure.com/Lidarr/Lidarr/_build/latest?definitionId=1&branchName=develop)
 [![Translation status](https://translate.servarr.com/widget/servarr/lidarr/svg-badge.svg)](https://translate.servarr.com/engage/servarr/?utm_source=widget)
 [![Docker Pulls](https://img.shields.io/docker/pulls/linuxserver/lidarr.svg)](https://wiki.servarr.com/lidarr/installation#docker)

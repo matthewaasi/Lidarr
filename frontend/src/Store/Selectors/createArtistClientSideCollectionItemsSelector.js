@@ -1,5 +1,4 @@
 import { createSelector, createSelectorCreator, defaultMemoize } from 'reselect';
-import hasDifferentItemsOrOrder from 'Utilities/Object/hasDifferentItemsOrOrder';
 import createClientSideCollectionSelector from './createClientSideCollectionSelector';
 
 function createUnoptimizedSelector(uiSection) {
@@ -27,7 +26,20 @@ function createUnoptimizedSelector(uiSection) {
 }
 
 function artistListEqual(a, b) {
-  return hasDifferentItemsOrOrder(a, b);
+  if (a === b) {
+    return true;
+  }
+
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => {
+    if (key !== 'items') {
+      return a[key] === b[key];
+    }
+
+    return a.items.length === b.items.length && a.items.every((item, index) => (
+      item.id === b.items[index].id && item.sortName === b.items[index].sortName
+    ));
+  });
 }
 
 const createArtistEqualSelector = createSelectorCreator(

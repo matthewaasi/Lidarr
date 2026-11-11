@@ -131,7 +131,7 @@ namespace Lidarr.Api.V1.Artist
 
         [HttpGet]
         [Produces("application/json")]
-        public List<ArtistResource> AllArtists(Guid? mbId)
+        public List<ArtistResource> AllArtists(Guid? mbId, bool includeAlbumDetails = true)
         {
             var artistStats = _artistStatisticsService.ArtistStatistics();
             var artistsResources = new List<ArtistResource>();
@@ -146,7 +146,7 @@ namespace Lidarr.Api.V1.Artist
             }
 
             MapCoversToLocal(artistsResources.ToArray());
-            LinkNextPreviousAlbums(artistsResources.ToArray());
+            LinkNextPreviousAlbums(includeAlbumDetails, artistsResources.ToArray());
             LinkArtistStatistics(artistsResources, artistStats.ToDictionary(x => x.ArtistId));
             artistsResources.ForEach(LinkRootFolderPath);
 
@@ -208,15 +208,22 @@ namespace Lidarr.Api.V1.Artist
 
         private void LinkNextPreviousAlbums(params ArtistResource[] artists)
         {
+            LinkNextPreviousAlbums(true, artists);
+        }
+
+        private void LinkNextPreviousAlbums(bool includeAlbumDetails, params ArtistResource[] artists)
+        {
             var artistMetadataIds = artists.Select(x => x.ArtistMetadataId).Distinct().ToList();
 
-            var nextAlbums = _albumService.GetNextAlbumsByArtistMetadataId(artistMetadataIds);
-            var lastAlbums = _albumService.GetLastAlbumsByArtistMetadataId(artistMetadataIds);
+            var nextAlbums = _albumService.GetNextAlbumsByArtistMetadataId(artistMetadataIds).ToLookup(x => x.ArtistMetadataId);
+            var lastAlbums = _albumService.GetLastAlbumsByArtistMetadataId(artistMetadataIds).ToLookup(x => x.ArtistMetadataId);
 
             foreach (var artistResource in artists)
             {
-                artistResource.NextAlbum = nextAlbums.FirstOrDefault(x => x.ArtistMetadataId == artistResource.ArtistMetadataId).ToResource();
-                artistResource.LastAlbum = lastAlbums.FirstOrDefault(x => x.ArtistMetadataId == artistResource.ArtistMetadataId).ToResource();
+                var next = nextAlbums[artistResource.ArtistMetadataId].FirstOrDefault();
+                var last = lastAlbums[artistResource.ArtistMetadataId].FirstOrDefault();
+                artistResource.NextAlbum = includeAlbumDetails ? next.ToResource() : next.ToSummaryResource();
+                artistResource.LastAlbum = includeAlbumDetails ? last.ToResource() : last.ToSummaryResource();
             }
         }
 

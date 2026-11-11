@@ -37,24 +37,23 @@ const selectTrackFiles = createSelector(
   }
 );
 
-function createMapStateToProps() {
+export function createMapStateToProps() {
   return createSelector(
     (state, { foreignAlbumId }) => foreignAlbumId,
     (state) => state.tracks,
     selectTrackFiles,
-    (state) => state.albums,
+    createSelector((state) => state.albums.items, (items) => _.orderBy(items, 'releaseDate')),
     createAllArtistSelector(),
     createCommandsSelector(),
     createUISettingsSelector(),
-    (foreignAlbumId, tracks, trackFiles, albums, artists, commands, uiSettings) => {
-      const sortedAlbums = _.orderBy(albums.items, 'releaseDate');
+    (foreignAlbumId, tracks, trackFiles, sortedAlbums, artists, commands, uiSettings) => {
       const albumIndex = _.findIndex(sortedAlbums, { foreignAlbumId });
       const album = sortedAlbums[albumIndex];
-      const artist = _.find(artists, { id: album.artistId });
-
       if (!album) {
         return {};
       }
+
+      const artist = _.find(artists, { id: album.artistId });
 
       const {
         isTrackFilesFetching,
