@@ -125,6 +125,9 @@ namespace NzbDrone.Core.Download
             var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
             var importResults = _downloadedTracksImportService.ProcessPath(outputPath, ImportMode.Auto, trackedDownload.RemoteAlbum.Artist, trackedDownload.ImportItem);
 
+            trackedDownload.AiSummary = NzbDrone.Core.MediaFiles.TrackImport.Identification.AiQueueSummary.Get(
+                importResults.Select(r => r.ImportDecision.Item?.AiMatch));
+
             if (VerifyImport(trackedDownload, importResults))
             {
                 return;

@@ -69,7 +69,7 @@ namespace NzbDrone.Core.Jobs
                 {
                     new ScheduledTask
                     {
-                        Interval = 1,
+                        Interval = Math.Clamp(_configService.QueueRefreshInterval, 1, 1440),
                         TypeName = typeof(RefreshMonitoredDownloadsCommand).FullName,
                         Priority = CommandPriority.High
                     },
@@ -223,14 +223,18 @@ namespace NzbDrone.Core.Jobs
 
         public void HandleAsync(ConfigSavedEvent message)
         {
+            var queue = _scheduledTaskRepository.GetDefinition(typeof(RefreshMonitoredDownloadsCommand));
+            queue.Interval = Math.Clamp(_configService.QueueRefreshInterval, 1, 1440);
+
             var rss = _scheduledTaskRepository.GetDefinition(typeof(RssSyncCommand));
             rss.Interval = GetRssSyncInterval();
 
             var backup = _scheduledTaskRepository.GetDefinition(typeof(BackupCommand));
             backup.Interval = GetBackupInterval();
 
-            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup });
+            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup, queue });
 
+            _cache.Find(queue.TypeName).Interval = queue.Interval;
             _cache.Find(rss.TypeName).Interval = rss.Interval;
             _cache.Find(backup.TypeName).Interval = backup.Interval;
         }

@@ -82,6 +82,7 @@ namespace NzbDrone.Core.Queue
                 TrackedDownloadStatus = trackedDownload.Status,
                 TrackedDownloadState = trackedDownload.State,
                 StatusMessages = trackedDownload.StatusMessages.ToList(),
+                AiSummary = trackedDownload.AiSummary,
                 ErrorMessage = trackedDownload.DownloadItem.Message,
                 RemoteAlbum = trackedDownload.RemoteAlbum,
                 DownloadId = trackedDownload.DownloadItem.DownloadId,

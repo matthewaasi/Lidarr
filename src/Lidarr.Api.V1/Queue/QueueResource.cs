@@ -32,6 +32,7 @@ namespace Lidarr.Api.V1.Queue
         public List<TrackedDownloadStatusMessage> StatusMessages { get; set; }
         public string ErrorMessage { get; set; }
         public string DownloadId { get; set; }
+        public string AiSummary { get; set; }
         public string Protocol { get; set; }
         public string DownloadClient { get; set; }
         public bool DownloadClientHasPostImportCategory { get; set; }
@@ -76,6 +77,7 @@ namespace Lidarr.Api.V1.Queue
                 TrackedDownloadStatus = model.TrackedDownloadStatus,
                 TrackedDownloadState = model.TrackedDownloadState,
                 StatusMessages = model.StatusMessages,
+                AiSummary = model.AiSummary,
                 ErrorMessage = model.ErrorMessage,
                 DownloadId = model.DownloadId,
                 Protocol = model.Protocol,

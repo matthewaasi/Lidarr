@@ -28,6 +28,7 @@ namespace NzbDrone.Core.Configuration
         int DownloadClientHistoryLimit { get; set; }
 
         // Completed/Failed Download Handling (Download client)
+        int QueueRefreshInterval { get; set; }
         bool EnableCompletedDownloadHandling { get; set; }
 
         bool AutoRedownloadFailed { get; set; }

@@ -88,6 +88,7 @@ class QueueRow extends Component {
       trackedDownloadStatus,
       trackedDownloadState,
       statusMessages,
+      aiSummary,
       errorMessage,
       artist,
       album,
@@ -156,6 +157,15 @@ class QueueRow extends Component {
                   statusMessages={statusMessages}
                   errorMessage={errorMessage}
                 />
+              );
+            }
+
+            if (name === 'aiSummary') {
+              const labels = { approved: 'AiApproved', issuesFound: 'AiIssuesFound', notAMatch: 'AiNotAMatch' };
+              return (
+                <TableRowCell key={name}>
+                  {translate(labels[aiSummary] || 'AiNotAssessed')}
+                </TableRowCell>
               );
             }
 
@@ -424,6 +434,7 @@ QueueRow.propTypes = {
   trackedDownloadStatus: PropTypes.string,
   trackedDownloadState: PropTypes.string,
   statusMessages: PropTypes.arrayOf(PropTypes.object),
+  aiSummary: PropTypes.string,
   errorMessage: PropTypes.string,
   artist: PropTypes.object,
   album: PropTypes.object,

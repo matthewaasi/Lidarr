@@ -190,6 +190,12 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("DownloadPropersAndRepacks", value); }
         }
 
+        public int QueueRefreshInterval
+        {
+            get { return GetValueInt("QueueRefreshInterval", 1); }
+            set { SetValue("QueueRefreshInterval", value); }
+        }
+
         public bool EnableCompletedDownloadHandling
         {
             get { return GetValueBoolean("EnableCompletedDownloadHandling", true); }

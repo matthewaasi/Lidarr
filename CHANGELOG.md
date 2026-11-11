@@ -2,6 +2,15 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.8 — Queue AI disposition and refresh settings
+
+- Added the Queue AI Summary column: Approved, Not a match, Issues found or Not assessed.
+- Kept Approved as an AI disposition only: Review mode still requires manual import.
+- Added Settings → Download Clients → Queue Refresh Interval, configurable from 1–1440 minutes with a one-minute default.
+- Updated scheduled polling when the interval is saved, without automatically retrying held AI decisions; no new database migration.
+
+**Recorded verification:** 13 focused backend tests passed; changed-file lint and the production frontend build passed. Backend analyzers were disabled for this build because of existing StyleCop issues.
+
 ## 3.2.1.5196-ai.7 — Matching settings and native Unique Singles
 
 - Added Settings → Identification with Original Lidarr or LM Studio engines, configurable native album/track scores (80%/60% defaults), and saved LM Studio settings.

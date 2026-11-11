@@ -66,6 +66,12 @@ export const defaultState = {
         isModifiable: false
       },
       {
+        name: 'aiSummary',
+        label: () => translate('AiSummary'),
+        isSortable: false,
+        isVisible: true
+      },
+      {
         name: 'artists.sortName',
         label: () => translate('Artist'),
         isSortable: true,

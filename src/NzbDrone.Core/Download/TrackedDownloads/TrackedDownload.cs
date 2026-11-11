@@ -12,6 +12,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         public TrackedDownloadStatus Status { get; private set; }
         public RemoteAlbum RemoteAlbum { get; set; }
         public TrackedDownloadStatusMessage[] StatusMessages { get; private set; }
+        public string AiSummary { get; set; }
         public string Protocol { get; set; }
         public string Indexer { get; set; }
         public DateTime? Added { get; set; }

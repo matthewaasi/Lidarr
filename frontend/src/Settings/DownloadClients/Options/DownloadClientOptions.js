@@ -35,6 +35,26 @@ function DownloadClientOptions(props) {
       }
 
       {
+        hasSettings && !isFetching && !error &&
+          <FieldSet legend={translate('Queue')}>
+            <Form>
+              <FormGroup size={sizes.MEDIUM}>
+                <FormLabel>{translate('QueueRefreshInterval')}</FormLabel>
+                <FormInputGroup
+                  type={inputTypes.NUMBER}
+                  name="queueRefreshInterval"
+                  min={1}
+                  max={1440}
+                  helpText={translate('QueueRefreshIntervalHelpText')}
+                  onChange={onInputChange}
+                  {...settings.queueRefreshInterval}
+                />
+              </FormGroup>
+            </Form>
+          </FieldSet>
+      }
+
+      {
         hasSettings && !isFetching && !error && advancedSettings &&
           <div>
             <FieldSet legend={translate('CompletedDownloadHandling')}>

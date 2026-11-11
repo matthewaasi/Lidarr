@@ -1,8 +1,8 @@
 # Lidarr AI Fork
 
-**Current version: 3.2.1.5196-ai.7** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
+**Current version: 3.2.1.5196-ai.8** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
 
-Matching settings and native Unique Singles. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
+Queue AI disposition and refresh settings. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
 
 ## Features
 
@@ -14,10 +14,11 @@ Matching settings and native Unique Singles. This fork adds optional AI identifi
 - Bounded, staged AI requests and adaptive context/output-limit subdivision.
 - Settings-selectable Original and LM Studio identification with native score and AI settings.
 - Optional native Unique Singles cleanup, a separate Singles Review page, and monitoring restoration when coverage disappears.
+- Queue AI disposition summary and configurable scheduled refresh interval.
 
 ## Download and install
 
-Get the Docker archive, original build source, installation files, checksums and verification records from the [ai.7 release](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.7). Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.7`. Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
+Get the Docker archive, original build source, installation files, checksums and verification records from the [ai.8 release](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.8). Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.8`. Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
 
 - Linux amd64 image, based on upstream Lidarr v3.2.1.5196 and the pinned LinuxServer nightly runtime. Assembly version remains 3.2.1.5196 for plugin compatibility.
 - Preserve /config, media mappings, ports, network and database configuration when replacing the container.
@@ -29,6 +30,7 @@ Get the Docker archive, original build source, installation files, checksums and
 
 | Release | Main changes | Details |
 | --- | --- | --- |
+| [ai.8](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.8) | Queue AI disposition and refresh settings | [Changelog and features](docs/releases/ai.8.md) |
 | [ai.7](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.7) | Matching settings and native Unique Singles | [Changelog and features](docs/releases/ai.7.md) |
 | [ai.6](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.6) | Staged AI matching | [Changelog and features](docs/releases/ai.6.md) |
 | [ai.5](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.5) | Complete-release protection and queue severity | [Changelog and features](docs/releases/ai.5.md) |
