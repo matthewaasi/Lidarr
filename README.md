@@ -31,19 +31,21 @@ Get the Docker archive, original build source, installation files, checksums and
 
 ## Release history
 
+GitHub publication tags use `ai.01`–`ai.09` so releases sort correctly. Docker image tags and filenames retain `ai.1`–`ai.9`. GitHub shows ten releases per page; [ai.1 is on page 2](https://github.com/matthewaasi/Lidarr/releases?page=2).
+
 | Release | Main changes | Details |
 | --- | --- | --- |
 | [ai.11](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.11) | Library Audit and faster library pages | [Changelog and features](docs/releases/ai.11.md) |
 | [ai.10](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.10) | Native-first identification with AI fallback | [Changelog and features](docs/releases/ai.10.md) |
-| [ai.9](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.9) | Manual track-picker recovery | [Changelog and features](docs/releases/ai.9.md) |
-| [ai.8](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.8) | Queue AI disposition and refresh settings | [Changelog and features](docs/releases/ai.8.md) |
-| [ai.7](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.7) | Matching settings and native Unique Singles | [Changelog and features](docs/releases/ai.7.md) |
-| [ai.6](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.6) | Staged AI matching | [Changelog and features](docs/releases/ai.6.md) |
-| [ai.5](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.5) | Complete-release protection and queue severity | [Changelog and features](docs/releases/ai.5.md) |
-| [ai.4](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.4) | Dedicated AI retry and quieter provider warnings | [Changelog and features](docs/releases/ai.4.md) |
-| [ai.3](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.3) | Saved AI previews and explicit retry | [Changelog and features](docs/releases/ai.3.md) |
-| [ai.2](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.2) | Native release-type search | [Changelog and features](docs/releases/ai.2.md) |
-| [ai.1](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.1) | AI-assisted music identification | [Changelog and features](docs/releases/ai.1.md) |
+| [ai.9](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.09) | Manual track-picker recovery | [Changelog and features](docs/releases/ai.9.md) |
+| [ai.8](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.08) | Queue AI disposition and refresh settings | [Changelog and features](docs/releases/ai.8.md) |
+| [ai.7](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.07) | Matching settings and native Unique Singles | [Changelog and features](docs/releases/ai.7.md) |
+| [ai.6](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.06) | Staged AI matching | [Changelog and features](docs/releases/ai.6.md) |
+| [ai.5](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.05) | Complete-release protection and queue severity | [Changelog and features](docs/releases/ai.5.md) |
+| [ai.4](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.04) | Dedicated AI retry and quieter provider warnings | [Changelog and features](docs/releases/ai.4.md) |
+| [ai.3](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.03) | Saved AI previews and explicit retry | [Changelog and features](docs/releases/ai.3.md) |
+| [ai.2](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.02) | Native release-type search | [Changelog and features](docs/releases/ai.2.md) |
+| [ai.1](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.01) | AI-assisted music identification | [Changelog and features](docs/releases/ai.1.md) |
 
 See [CHANGELOG.md](CHANGELOG.md) for version-by-version changes and [FEATURES.md](FEATURES.md) for this version’s cumulative feature summary. Earlier releases are historical snapshots and may lack later safeguards.
 
