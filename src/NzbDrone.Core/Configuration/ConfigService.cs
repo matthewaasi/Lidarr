@@ -84,6 +84,66 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("AutoUnmonitorPreviouslyDownloadedTracks", value); }
         }
 
+        public string MatchingEngine
+        {
+            get => GetValue("MatchingEngine", "LmStudio");
+            set => SetValue("MatchingEngine", value);
+        }
+
+        public int OriginalAlbumMatchPercent
+        {
+            get => GetValueInt("OriginalAlbumMatchPercent", 80);
+            set => SetValue("OriginalAlbumMatchPercent", value);
+        }
+
+        public int OriginalTrackMatchPercent
+        {
+            get => GetValueInt("OriginalTrackMatchPercent", 60);
+            set => SetValue("OriginalTrackMatchPercent", value);
+        }
+
+        public string LmStudioBaseUrl
+        {
+            get => GetValue("LmStudioBaseUrl", string.Empty);
+            set => SetValue("LmStudioBaseUrl", value);
+        }
+
+        public string LmStudioModel
+        {
+            get => GetValue("LmStudioModel", string.Empty);
+            set => SetValue("LmStudioModel", value);
+        }
+
+        public string LmStudioMode
+        {
+            get => GetValue("LmStudioMode", string.Empty);
+            set => SetValue("LmStudioMode", value);
+        }
+
+        public int LmStudioConfidencePercent
+        {
+            get => GetValueInt("LmStudioConfidencePercent", 95);
+            set => SetValue("LmStudioConfidencePercent", value);
+        }
+
+        public bool UniqueSinglesEnabled
+        {
+            get => GetValueBoolean("UniqueSinglesEnabled", false);
+            set => SetValue("UniqueSinglesEnabled", value);
+        }
+
+        public bool UniqueSinglesTitleDuration
+        {
+            get => GetValueBoolean("UniqueSinglesTitleDuration", true);
+            set => SetValue("UniqueSinglesTitleDuration", value);
+        }
+
+        public int UniqueSinglesToleranceMs
+        {
+            get => GetValueInt("UniqueSinglesToleranceMs", 3000);
+            set => SetValue("UniqueSinglesToleranceMs", value);
+        }
+
         public int Retention
         {
             get { return GetValueInt("Retention", 0); }

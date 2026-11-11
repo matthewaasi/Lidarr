@@ -8,6 +8,6 @@ namespace NzbDrone.Core.Download
         public override bool RequiresDiskAccess => true;
         public override bool IsLongRunning => true;
         public override bool IsTypeExclusive => true;
-        public override string CompletionMessage => "AI matching retry finished";
+        public override string CompletionMessage => "Matching retry finished";
     }
 }

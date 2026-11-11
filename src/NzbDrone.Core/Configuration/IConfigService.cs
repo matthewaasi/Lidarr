@@ -12,6 +12,17 @@ namespace NzbDrone.Core.Configuration
 
         bool IsDefined(string key);
 
+        string MatchingEngine { get; set; }
+        int OriginalAlbumMatchPercent { get; set; }
+        int OriginalTrackMatchPercent { get; set; }
+        string LmStudioBaseUrl { get; set; }
+        string LmStudioModel { get; set; }
+        string LmStudioMode { get; set; }
+        int LmStudioConfidencePercent { get; set; }
+        bool UniqueSinglesEnabled { get; set; }
+        bool UniqueSinglesTitleDuration { get; set; }
+        int UniqueSinglesToleranceMs { get; set; }
+
         // Download Client
         string DownloadClientWorkingFolders { get; set; }
         int DownloadClientHistoryLimit { get; set; }

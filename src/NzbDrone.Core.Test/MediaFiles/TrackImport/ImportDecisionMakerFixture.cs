@@ -7,6 +7,7 @@ using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.History;
@@ -453,6 +454,18 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport
             decisions[0].Rejections[0].Reason.Should().Be("Saved proposal");
             Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Never());
             Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Save(It.IsAny<List<ImportDecision<LocalTrack>>>()), Times.Never());
+        }
+
+        [Test]
+        public void original_manual_preview_must_not_reuse_cached_ai_proposals()
+        {
+            GivenAudioFiles(new[] { @"C:\Test\preview.flac".AsOsAgnostic() });
+            _idConfig.UseCachedIdentificationOnly = true;
+            Mocker.GetMock<IConfigService>().SetupGet(c => c.MatchingEngine).Returns("Original");
+            Mocker.GetMock<IIdentificationService>().Setup(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>())).Returns(new List<LocalAlbumRelease>());
+            Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Read(It.IsAny<List<LocalTrack>>()), Times.Never());
+            Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Once());
         }
 
         [Test]

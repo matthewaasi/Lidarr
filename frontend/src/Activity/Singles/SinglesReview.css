@@ -1,0 +1,67 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 15px 0;
+  gap: 12px;
+}
+
+.toolbar button,
+.toolbar select,
+.confirm button {
+  padding: 7px 12px;
+  border: 1px solid #888;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar select {
+  background: var(--inputBackgroundColor);
+}
+
+.card {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #888;
+  border-radius: 4px;
+}
+
+.comparison {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid #888;
+  vertical-align: top;
+}
+
+.table small {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+
+.confirm {
+  padding: 12px;
+  border: 2px solid #e09b32;
+}
+
+.confirm button {
+  margin-right: 10px;
+}

@@ -191,7 +191,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     continue;
                 }
 
-                _logger.ProgressInfo("Retrying AI matching for download {0}/{1}: {2}", ++index, downloads.Count, download.DownloadItem.Title);
+                _logger.ProgressInfo("Retrying identification for download {0}/{1}: {2}", ++index, downloads.Count, download.DownloadItem.Title);
                 try
                 {
                     _completedDownloadService.Import(download);

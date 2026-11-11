@@ -5,6 +5,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.MediaFiles.TrackImport.Aggregation;
@@ -53,6 +54,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         private readonly IAugmentingService _augmentingService;
         private readonly IIdentificationService _identificationService;
         private readonly IAiImportDecisionCache _aiDecisionCache;
+        private readonly IConfigService _configService;
         private readonly IRootFolderService _rootFolderService;
         private readonly IQualityProfileService _qualityProfileService;
         private readonly Logger _logger;
@@ -64,6 +66,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                                    IAugmentingService augmentingService,
                                    IIdentificationService identificationService,
                                    IAiImportDecisionCache aiDecisionCache,
+                                   IConfigService configService,
                                    IRootFolderService rootFolderService,
                                    IQualityProfileService qualityProfileService,
                                    Logger logger)
@@ -75,6 +78,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
             _augmentingService = augmentingService;
             _identificationService = identificationService;
             _aiDecisionCache = aiDecisionCache;
+            _configService = configService;
             _rootFolderService = rootFolderService;
             _qualityProfileService = qualityProfileService;
             _logger = logger;
@@ -154,7 +158,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             localTracks.ForEach(x => x.ExistingFile = !config.NewDownload);
 
-            if (config.UseCachedIdentificationOnly)
+            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine != "Original")
             {
                 decisions.AddRange(_aiDecisionCache.Read(localTracks));
                 return decisions;

@@ -363,7 +363,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             Identify();
             Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.True);
             Assert.That(_local.LocalTracks[0].Tracks.Single().Id, Is.EqualTo(1));
-            Assert.That(new CloseTrackMatchSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local.LocalTracks[0], null).Accepted, Is.True);
+            Assert.That(new CloseTrackMatchSpecification(new Mock<IConfigService>().Object, LogManager.GetLogger("test")).IsSatisfiedBy(_local.LocalTracks[0], null).Accepted, Is.True);
             _audit.Verify(a => a.Write(_local), Times.Once());
         }
 
@@ -376,7 +376,7 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             Assert.That(_local.LocalTracks[0].AiMatch.IsError, Is.False);
             Assert.That(_local.LocalTracks[0].AiMatch.Accepted, Is.False);
             Assert.That(_local.LocalTracks[0].Tracks.Single().Id, Is.EqualTo(1));
-            Assert.That(new CloseTrackMatchSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local.LocalTracks[0], null).Accepted, Is.False);
+            Assert.That(new CloseTrackMatchSpecification(new Mock<IConfigService>().Object, LogManager.GetLogger("test")).IsSatisfiedBy(_local.LocalTracks[0], null).Accepted, Is.False);
         }
 
         [Test]

@@ -2,6 +2,17 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.7 — Matching settings and native Unique Singles
+
+- Added Settings → Identification with Original Lidarr or LM Studio engines, configurable native album/track scores (80%/60% defaults), and saved LM Studio settings.
+- Restored native matching and fingerprint retry without LM Studio requests; changing engines alone does not retry held downloads. Renamed the explicit queue action to Retry Matching.
+- Added optional native Unique Singles cleanup, off by default, based on the gergc fork with MIT attribution. Every single track must have downloaded monitored album/EP coverage.
+- Added recording-ID and optional title/duration matching, exclusive-track protection, version-conflict review, file ownership checks and normal recycle-bin deletion.
+- Added Activity → Singles Review with per-track evidence, confirmation, approve/keep/recheck actions, stale-evidence protection and persistent monitoring ownership.
+- Added automatic re-monitoring when coverage disappears while preserving alternative coverage and manual choices; added main-database migration 82.
+
+**Recorded verification:** 121 backend and 26 frontend tests passed; isolated API/startup checks and PostgreSQL SQL-generation checks passed.
+
 ## 3.2.1.5196-ai.6 — Staged AI matching
 
 - Split large candidate sets, file batches and long track lists into bounded requests, then compared proposals before applying a combined decision.

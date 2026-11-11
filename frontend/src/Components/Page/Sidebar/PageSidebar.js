@@ -53,6 +53,10 @@ const links = [
         statusComponent: QueueStatusConnector
       },
       {
+        title: () => 'Singles Review',
+        to: '/activity/singles'
+      },
+      {
         title: () => translate('History'),
         to: '/activity/history'
       },
@@ -87,6 +91,14 @@ const links = [
       {
         title: () => translate('MediaManagement'),
         to: '/settings/mediamanagement'
+      },
+      {
+        title: () => 'Identification',
+        to: '/settings/identification'
+      },
+      {
+        title: () => 'Unique Singles',
+        to: '/settings/uniquesingles'
       },
       {
         title: () => translate('Profiles'),

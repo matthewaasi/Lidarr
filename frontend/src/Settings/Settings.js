@@ -14,6 +14,11 @@ function Settings() {
       />
 
       <PageContentBody>
+        <Link className={styles.link} to="/settings/identification">Identification</Link>
+        <div className={styles.summary}>Choose Original Lidarr or LM Studio matching and configure match thresholds.</div>
+        <Link className={styles.link} to="/settings/uniquesingles">Unique Singles</Link>
+        <div className={styles.summary}>Enable optional duplicate-single cleanup and monitoring restoration.</div>
+
         <Link
           className={styles.link}
           to="/settings/mediamanagement"

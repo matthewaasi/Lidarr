@@ -1,4 +1,4 @@
-# Lidarr AI Matcher — 3.2.1.5196-ai.6
+# Lidarr AI Matcher — 3.2.1.5196-ai.7
 
 Based on upstream `Lidarr/Lidarr` tag `v3.2.1.5196`, commit `6af1274a11957270a308fd0448ffe624a8e264d0`.
 The container uses LinuxServer's `nightly-3.2.1.5196-ls224` runtime and s6 startup.
@@ -42,7 +42,7 @@ Manual Import's review popover shows the explanation and candidate releases. The
 On an x86-64 Docker host, from this source directory:
 
 ```sh
-docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.6 .
+docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.7 .
 ```
 
 The multi-stage Dockerfile builds the UI with Node 22/Yarn 1.22.22 and publishes the application plus the dynamically loaded `Lidarr.Mono` platform library with .NET SDK 8.0.421 for `linux-musl-x64`.
@@ -102,3 +102,21 @@ A context-related HTTP 400 with a recognizable context-exceeded message triggers
 Every response is independently validated against that stage. A final global check rejects duplicate track assignments across file stages. Only after all stages succeed is one combined answer applied to the release. Partial successes cannot import when a later stage fails. Review mode, confidence thresholds, complete-release enforcement, saved Manual Import previews and red/yellow severity remain in place. Existing AI decisions are not automatically recalculated: use Retry AI after upgrading.
 
 Stage number, file count, candidate count and request character count are logged without full prompts or credentials. Reasons are requested as one short sentence to discourage runaway output. There is no new Queue progress bar in this build.
+
+## Settings and native Unique Singles (ai.7)
+
+Settings > Identification selects Original Lidarr or LM Studio. Default remains LM Studio for existing fork installations. Original restores native weighted metadata matching, candidate comparison, and fingerprint retry behavior without calling LM Studio. Minimum album score defaults to 80%; minimum track score defaults to the stock 60%. Both are configurable from 1-100. These are metadata similarity scores, not calibrated probabilities. Missing-track protection remains active in both modes.
+
+LM Studio server URL, model identifier, Review/Automatic mode, and minimum confidence can now be saved in Settings. Existing Docker environment values supply initial defaults until those settings are saved; saved values take precedence. API-key, timeout and staging environment options are unchanged. Original-mode Manual Import performs native identification rather than reusing saved AI proposals. LM Studio-mode Manual Import still reads saved proposals; explicit Map Tracks runs fresh identification. Switching engines alone does not rearm held imports or import them. The former Retry AI button is now labeled Retry Matching and explicitly retries eligible held downloads using the selected engine. A retry in Original mode can import according to normal native rules; LM Studio failures still never silently fall back to Original.
+
+Settings > Unique Singles has an independent enable switch, off by default. Disable the external UniqueSingles plugin's active Connect/Metadata actions before enabling the native feature to avoid two cleanup systems. Native matching follows the three-tier concept of gergc/lidarr-plugin-uniquesingles, reference commit 7aa0ef600322c0a2c975e2d91b86182b4897b3d9 (MIT license retained in LICENSES/UniqueSingles.txt). It does not call LM Studio.
+
+Every track on a single's selected release must be covered by a physically present file on a monitored album/EP of the same artist. Matching recording IDs qualify automatically unless version/duration evidence conflicts. By default, normalized title plus duration within 3000 ms also qualifies, following the plugin's behavior. Turn that option off to require recording-ID matches for automatic cleanup. Title-only matches, conflicting versions/durations, and title+duration matches in ID-only mode enter Singles Review. These are metadata matches, not proof of bit-identical audio.
+
+Exclusive B-sides keep the whole single. Live, Remix, DJ-mix and Demo albums are excluded as sources. Singles without downloaded files require all exact recording-ID matches before automatic unmonitoring. Unmapped single files, incomplete track metadata, shared physical paths and incomplete coverage block deletion. Missing artist folders skip processing rather than treating an offline library as lost coverage.
+
+Activity > Singles Review is a separate paginated page with per-track titles, durations, recording IDs, counterpart albums, reasons and links. Approve cleanup requires an explicit confirmation. The server re-evaluates the full release and checks a fingerprint of the reviewed metadata/files before accepting approval; stale evidence is refreshed and rejected with HTTP 409. Keep preserves the current monitoring state and suppresses future cleanup until explicitly rechecked. Recheck refreshes evidence and does not delete. Pending decisions are never promoted into automatic cleanup merely because a later scan finds stronger evidence.
+
+Cleanup persists ownership, unmonitors the single, and deletes only its own mapped files through Lidarr's recycle-bin/deletion service. It rechecks covering files before each deletion. A failure remains visible and is not automatically retried. Review records and automatic monitoring ownership persist in the main database's new SinglesDecisions table (migration 82), including PostgreSQL. Copying appdata alone does not back up PostgreSQL.
+
+After imports, album deletion, or file deletion, an artist-scoped check is queued. A daily task and Scan now cover missed changes and externally missing files. When album/EP coverage disappears, only singles this feature still owns are re-monitored; an alternative downloaded album/EP can retain coverage. Subsequent manual monitoring edits and Keep decisions relinquish ownership. Restoring monitoring permits normal download handling; it neither restores deleted files nor immediately launches a forced search. While disabled, no scans, automatic cleanup or monitoring restoration run. Existing decisions remain readable. No past plugin cleanup is retroactively claimed because its monitoring ownership is unknown.
