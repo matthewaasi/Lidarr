@@ -2,6 +2,15 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.5 — Complete-release protection and queue severity
+
+- Blocked automatic import of new downloads missing expected tracks, including a one-file download identified as a two-track single; errors show missing counts and titles.
+- Allowed matched existing library tracks to contribute to completeness while preserving library-rescan behavior.
+- Marked definitive AI non-matches, inference failures and definite missing-track errors red; review proposals and uncertainty remain yellow.
+- Preserved Manual Import for error rows, prevented automatic preselection of error proposals, and kept an extra true non-match from being hidden by a complete album count.
+
+**Recorded verification:** 75 backend and 19 frontend tests passed.
+
 ## 3.2.1.5196-ai.4 — Dedicated AI retry and quieter provider warnings
 
 - Added Retry AI beside Queue Refresh with independent command progress and duplicate-submission guards.

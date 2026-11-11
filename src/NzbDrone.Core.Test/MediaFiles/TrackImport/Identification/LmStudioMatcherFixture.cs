@@ -117,13 +117,14 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             _settings.Automatic = false;
             Identify();
             Assert.That(_local.LocalTracks[0].AiMatch.Proposed, Is.True);
+            Assert.That(_local.LocalTracks[0].AiMatch.IsError, Is.False);
             Assert.That(_local.LocalTracks[0].AiMatch.Accepted, Is.False);
             Assert.That(_local.LocalTracks[0].Tracks.Single().Id, Is.EqualTo(1));
             Assert.That(new CloseTrackMatchSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local.LocalTracks[0], null).Accepted, Is.False);
         }
 
         [Test]
-        public void uncertainty_should_reject_only_the_affected_file()
+        public void uncertainty_should_leave_the_file_unmapped_and_block_an_incomplete_new_release()
         {
             _answer["files"][1]["trackId"] = null;
             _answer["files"][1]["status"] = "review";
@@ -131,9 +132,10 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
             Identify();
             Assert.That(_local.LocalTracks[0].AiMatch.Accepted, Is.True);
             Assert.That(_local.LocalTracks[1].AiMatch.Accepted, Is.False);
+            Assert.That(_local.LocalTracks[1].AiMatch.IsError, Is.False);
             Assert.That(_local.LocalTracks[1].Tracks, Is.Empty);
             _local.NewDownload = true;
-            Assert.That(new NoMissingOrUnmatchedTracksSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local, null).Accepted, Is.True);
+            Assert.That(new NoMissingOrUnmatchedTracksSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local, null).Accepted, Is.False);
         }
 
         [TestCase("duplicate-track")]
@@ -171,12 +173,42 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
         }
 
         [Test]
+        public void one_file_for_two_track_single_must_fail_completeness_even_with_confident_ai_match()
+        {
+            _local.LocalTracks.RemoveAt(1);
+            ((JArray)_answer["files"]).RemoveAt(1);
+            Identify();
+            _local.NewDownload = true;
+            var decision = new NoMissingOrUnmatchedTracksSpecification(LogManager.GetLogger("test")).IsSatisfiedBy(_local, null);
+            Assert.That(_local.LocalTracks.Single().AiMatch.Accepted, Is.True);
+            Assert.That(decision.Accepted, Is.False);
+            Assert.That(decision.Reason, Does.Contain("1 of 2"));
+            Assert.That(decision.Reason, Does.Contain("Second title"));
+        }
+
+        [Test]
+        public void explicit_non_match_must_be_an_error_even_without_selected_release()
+        {
+            _answer["candidateId"] = null;
+            foreach (var row in _answer["files"])
+            {
+                row["status"] = "no_match";
+                row["trackId"] = null;
+            }
+
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.IsError && f.AiMatch.Status == "no_match"), Is.True);
+        }
+
+        [Test]
         public void timeout_should_clear_stale_match_and_require_review()
         {
             Identify();
             _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Throws(new TimeoutException());
             Identify();
             Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.IsError), Is.True);
             Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted && !f.Tracks.Any()), Is.True);
         }
 

@@ -314,3 +314,74 @@ test('Queue toolbar places Retry AI immediately after Refresh and tracks its own
   assert.equal(buttons[1].props.isSpinning, true);
   assert.equal(Boolean(buttons[0].props.isSpinning), false);
 });
+
+test('Queue status renders true import errors red and review cautions yellow', () => {
+  const StatusCell = load('Activity/Queue/QueueStatusCell.js', {
+    'Components/Icon': stub,
+    'Components/Table/Cells/TableRowCell': stub,
+    'Components/Tooltip/Popover': stub,
+    'Helpers/Props': { icons: {}, kinds: { DANGER: 'red', WARNING: 'yellow' }, tooltipPositions: {} },
+    'Utilities/String/translate': (key) => key,
+    './QueueStatusCell.css': {}
+  }).default;
+  for (const [status, color] of [['error', 'red'], ['warning', 'yellow']]) {
+    const cell = StatusCell({ status: 'completed', trackedDownloadState: 'importFailed', trackedDownloadStatus: status, statusMessages: [] });
+    assert.equal(cell.props.children.props.anchor.props.kind, color);
+  }
+});
+
+test('Compact queue details use the same red/yellow distinction', () => {
+  const Details = load('Activity/Queue/QueueDetails.js', {
+    'Components/Icon': stub,
+    'Helpers/Props': { icons: {}, kinds: { DANGER: 'red', WARNING: 'yellow' } },
+    'Utilities/String/translate': (key) => key
+  }).default;
+  for (const [status, color] of [['error', 'red'], ['warning', 'yellow']]) {
+    assert.equal(Details({ status: 'completed', trackedDownloadStatus: status, size: 1, sizeleft: 0 }).props.kind, color);
+  }
+});
+
+test('Manual Import remains available for red errors as well as yellow review holds', () => {
+  const button = () => null;
+  const interactive = {};
+  const imports = Object.fromEntries([
+    'Activity/Queue/ProtocolLabel', 'Album/AlbumFormats', 'Album/AlbumTitleLink', 'Album/TrackQuality', 'Artist/ArtistNameLink',
+    'Components/Icon', 'Components/Link/SpinnerIconButton', 'Components/ProgressBar', 'Components/Table/Cells/RelativeDateCellConnector',
+    'Components/Table/Cells/TableRowCell', 'Components/Table/Cells/TableSelectCell', 'Components/Table/TableRow', 'Components/Tooltip/Popover',
+    'Components/Tooltip/Tooltip', 'InteractiveImport/InteractiveImportModal', './QueueStatusCell', './RemoveQueueItemModal', './TimeleftCell'
+  ].map((name) => [name, stub]));
+  const Row = load('Activity/Queue/QueueRow.js', {
+    ...imports,
+    'Components/Link/IconButton': button,
+    'Helpers/Props': { icons: { INTERACTIVE: interactive }, kinds: {}, tooltipPositions: {} },
+    'Utilities/Number/formatBytes': String,
+    'Utilities/Number/formatCustomFormatScore': String,
+    'Utilities/String/translate': (key) => key,
+    './QueueRow.css': {}
+  }).default;
+  for (const status of ['error', 'warning']) {
+    const row = new Row({ status: 'completed', trackedDownloadStatus: status, columns: [{ name: 'actions', isVisible: true }], size: 1, sizeleft: 0 });
+    assert.ok(nodes(row.render()).some((node) => node.type === button && node.props.name === interactive));
+  }
+});
+
+test('Manual Import does not preselect a matched track when its release has a true error', () => {
+  const filename = 'InteractiveImport/Interactive/InteractiveImportRow.js';
+  const source = fs.readFileSync(path.resolve(__dirname, '../src', filename), 'utf8');
+  const imports = {};
+  for (const match of source.matchAll(/from '([^']+)'/g)) {
+    if (!['react', 'prop-types'].includes(match[1])) imports[match[1]] = stub;
+  }
+  imports['Helpers/Props'] = nativeProps;
+  const Row = load(filename, imports).default;
+  for (const [aiMatch, expected] of [
+    [{ accepted: true, isError: true }, 0],
+    [{ accepted: false, isError: false }, 0],
+    [{ accepted: true, isError: false }, 1]
+  ]) {
+    let selected = 0;
+    const row = new Row({ id: 1, artist: {}, album: {}, tracks: [{}], quality: {}, size: 1, aiMatch, onSelectedChange: () => { selected++; } });
+    row.componentDidMount();
+    assert.equal(selected, expected);
+  }
+});

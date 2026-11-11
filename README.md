@@ -1,8 +1,8 @@
 # Lidarr AI Fork
 
-**Current version: 3.2.1.5196-ai.4** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
+**Current version: 3.2.1.5196-ai.5** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
 
-Dedicated AI retry and quieter provider warnings. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
+Complete-release protection and queue severity. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
 
 ## Features
 
@@ -10,15 +10,15 @@ Dedicated AI retry and quieter provider warnings. This fork adds optional AI ide
 - Native release-type search buttons on artist pages.
 - Persistent saved AI decisions for Manual Import previews, with explicit fresh mapping.
 - Retry AI is separate from Refresh; unavailable-provider warning spam is suppressed without deleting configuration.
+- Complete-release protection and red errors versus yellow review warnings.
 
 ## Download and install
 
-Get the Docker archive, original build source, installation files, checksums and verification records from the [ai.4 release](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.4). Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.4`. Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
+Get the Docker archive, original build source, installation files, checksums and verification records from the [ai.5 release](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.5). Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.5`. Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
 
 - Linux amd64 image, based on upstream Lidarr v3.2.1.5196 and the pinned LinuxServer nightly runtime. Assembly version remains 3.2.1.5196 for plugin compatibility.
 - Preserve /config, media mappings, ports, network and database configuration when replacing the container.
 - Back up appdata and any external PostgreSQL databases before upgrading; rollback across migrations can require a database restore. Historical releases can lack later fixes and should not be used as a casual downgrade path.
-- Known historical limitation: the strict missing-track safeguard and red/yellow AI error classification were added in ai.5.
 - Known historical limitation: staged AI requests were added in ai.6; large prompts in this version can exceed the model context.
 - Test counts describe each original build’s recorded verification, not a fresh rerun during this repository reorganization. Linux container execution and third-party plugin behavior require runtime verification.
 
@@ -26,6 +26,7 @@ Get the Docker archive, original build source, installation files, checksums and
 
 | Release | Main changes | Details |
 | --- | --- | --- |
+| [ai.5](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.5) | Complete-release protection and queue severity | [Changelog and features](docs/releases/ai.5.md) |
 | [ai.4](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.4) | Dedicated AI retry and quieter provider warnings | [Changelog and features](docs/releases/ai.4.md) |
 | [ai.3](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.3) | Saved AI previews and explicit retry | [Changelog and features](docs/releases/ai.3.md) |
 | [ai.2](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.2) | Native release-type search | [Changelog and features](docs/releases/ai.2.md) |

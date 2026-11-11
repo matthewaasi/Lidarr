@@ -69,7 +69,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 settings.Validate();
                 if (candidates.Count == 0)
                 {
-                    Review(localRelease, "No metadata candidates found; select an artist, album and release in Manual Import", settings.Model, candidateDescriptions);
+                    Review(localRelease, "No metadata candidates found; select an artist, album and release in Manual Import", settings.Model, candidateDescriptions, true);
                     return;
                 }
 
@@ -79,7 +79,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 var payload = BuildRequest(input, settings);
                 if (payload.ToString(Formatting.None).Length > settings.MaxRequestCharacters)
                 {
-                    Review(localRelease, "Candidate batch exceeds AI request size limit; narrow the artist/album/release in Manual Import", settings.Model, candidateDescriptions);
+                    Review(localRelease, "Candidate batch exceeds AI request size limit; narrow the artist/album/release in Manual Import", settings.Model, candidateDescriptions, true);
                     return;
                 }
 
@@ -98,7 +98,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 // No traditional matcher fallback, including on invalid configuration, timeout or invalid JSON.
                 _logger.Warn("AI identification requires manual review ({0})", ex.GetType().Name);
                 var detail = ex is ArgumentException || ex is InvalidDataException || ex is HttpRequestException ? ex.Message : ex.GetType().Name;
-                Review(localRelease, "AI matching failed: " + detail, null, candidateDescriptions);
+                Review(localRelease, "AI matching failed: " + detail, null, candidateDescriptions, true);
             }
             finally
             {
@@ -264,6 +264,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
                 {
                     Accepted = proposed && settings.Automatic,
                     Proposed = proposed,
+                    IsError = status == "no_match",
+                    Status = status,
                     Confidence = confidence,
                     Reason = proposed && !settings.Automatic ? "Review mode: " + reason : reason,
                     Model = settings.Model,
@@ -281,6 +283,11 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             if (candidate == null || albumConfidence < settings.MinimumConfidence)
             {
                 Review(localRelease, "Release requires review: " + albumReason, settings.Model, descriptions);
+                foreach (var pair in results.Where(p => p.Value.Status == "no_match"))
+                {
+                    pair.Key.AiMatch = pair.Value;
+                }
+
                 return;
             }
 
@@ -314,19 +321,19 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             localRelease.PopulateMatch();
         }
 
-        private static void Review(LocalAlbumRelease release, string reason, string model, List<string> candidates)
+        private static void Review(LocalAlbumRelease release, string reason, string model, List<string> candidates, bool isError = false)
         {
             release.AlbumRelease = null;
             release.ExistingTracks = new List<LocalTrack>();
             release.TrackMapping = new TrackMapping { LocalExtra = release.LocalTracks.ToList(), MBExtra = new List<Track>() };
-            release.AiMatch = new AiMatchResult { Reason = reason, Model = model, Candidates = candidates };
+            release.AiMatch = new AiMatchResult { Reason = reason, Model = model, Candidates = candidates, IsError = isError, Status = isError ? "error" : "review" };
             foreach (var file in release.LocalTracks)
             {
                 file.Tracks.Clear();
                 file.Release = null;
                 file.Album = null;
                 file.Artist = null;
-                file.AiMatch = new AiMatchResult { Reason = reason, Model = model, Candidates = candidates };
+                file.AiMatch = new AiMatchResult { Reason = reason, Model = model, Candidates = candidates, IsError = isError, Status = isError ? "error" : "review" };
             }
         }
     }

@@ -141,6 +141,18 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
         }
 
         [Test]
+        public void saved_non_match_severity_must_survive_restart()
+        {
+            _file.Release = null;
+            _file.Tracks.Clear();
+            _file.AiMatch = new AiMatchResult { Status = "no_match", IsError = true, Reason = "None of the candidates match" };
+            Save();
+            var result = NewCache().Read(new List<LocalTrack> { PreviewFile() }).Single();
+            Assert.That(result.Item.AiMatch.IsError, Is.True);
+            Assert.That(result.Item.AiMatch.Status, Is.EqualTo("no_match"));
+        }
+
+        [Test]
         public void corrupted_cache_must_not_prevent_manual_review()
         {
             Directory.CreateDirectory(_folder);

@@ -30,12 +30,12 @@ function QueueDetails(props) {
   }
 
   if (status === 'completed') {
-    if (errorMessage) {
+    if (errorMessage || trackedDownloadStatus === 'error') {
       return (
         <Icon
           name={icons.DOWNLOAD}
           kind={kinds.DANGER}
-          title={translate('ImportFailedInterp', [errorMessage])}
+          title={errorMessage ? translate('ImportFailedInterp', [errorMessage]) : translate('ImportFailed', { sourceTitle: title })}
         />
       );
     }

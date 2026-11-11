@@ -1,4 +1,4 @@
-# Lidarr AI Matcher — 3.2.1.5196-ai.4
+# Lidarr AI Matcher — 3.2.1.5196-ai.5
 
 Based on upstream `Lidarr/Lidarr` tag `v3.2.1.5196`, commit `6af1274a11957270a308fd0448ffe624a8e264d0`.
 The container uses LinuxServer's `nightly-3.2.1.5196-ls224` runtime and s6 startup.
@@ -11,7 +11,7 @@ Each album batch includes filenames, album context, tags, durations, track/disc 
 
 The matcher validates complete file coverage, distinct file and track tokens, selected-release membership, finite confidence in 0..1, explanations, completion status, and existing-file eligibility before applying a batch. Invalid JSON, truncation, refusal, timeout, network/configuration errors, absent candidates, oversized requests and ambiguous release identity require manual review. There is no automatic traditional-matcher fallback.
 
-`Review` mode keeps validated proposals visible in Manual Import but rejects automatic import. Explicitly selecting and importing in Manual Import is a human approval. The UI does not automatically select AI review proposals. `Automatic` mode permits validated mappings above the configured confidence threshold through the normal import safeguards. Uncertain individual files remain rejected without an album-wide completeness rejection; other album safeguards, such as wanted-release and upgrade checks, still apply.
+`Review` mode keeps validated proposals visible in Manual Import but rejects automatic import. Explicitly selecting and importing in Manual Import is a human approval. The UI does not automatically select AI review proposals or true-error rows. `Automatic` mode permits validated mappings above the configured confidence threshold through the normal import safeguards. New downloads must identify every expected track in the selected release; missing or unresolved expected tracks block the entire release's automatic import. Other album safeguards, such as wanted-release and upgrade checks, still apply.
 
 Existing candidate retrieval can still exclude an album or artist. AI does not search the entire MusicBrainz database itself. If no useful candidate appears, narrow or select the artist/album/release in Manual Import and request mapping again. A large batch is rejected for review rather than silently dropping candidates.
 
@@ -42,7 +42,7 @@ Manual Import's review popover shows the explanation and candidate releases. The
 On an x86-64 Docker host, from this source directory:
 
 ```sh
-docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.4 .
+docker build --platform linux/amd64 -t lidarr-ai:3.2.1.5196-ai.5 .
 ```
 
 The multi-stage Dockerfile builds the UI with Node 22/Yarn 1.22.22 and publishes the application plus the dynamically loaded `Lidarr.Mono` platform library with .NET SDK 8.0.421 for `linux-musl-x64`.
@@ -82,3 +82,11 @@ Results and original rejection reasons are saved atomically to `/config/ai-impor
 `DownloadClientRepository` reads a persisted download-client row whose `ConfigContract` names the provider settings class. The warning about `DeemixSettings` means that class is unavailable in the loaded assemblies (for example, an old Deemix configuration whose plugin is no longer installed or failed to load). The provider was already being skipped; this is independent of the AI matcher.
 
 The repository now logs one actionable warning per unavailable entry/settings type per process instead of on every poll. It includes the name and ID and preserves the database row, enable state, settings, and credentials. A returning provider clears the suppression for that same entry. Other provider errors are not suppressed. This avoids deleting a potentially recoverable plugin configuration. Restoring the matching provider/plugin, or removing a verified obsolete database entry while Lidarr is stopped and backed up, resolves the underlying configuration issue completely. The supplied diagnostic SQL only lists the Deemix entry and does not expose its settings or modify it.
+
+## Completeness and queue severity (ai.5)
+
+The AI exception in the old completeness specification was too broad. ai.5 restores completeness enforcement for new downloads before that exception. One matched file for a two-track release is rejected with a missing count and track titles, even if the AI is confident and Automatic mode is enabled. Existing correctly matched library files included in the selected candidate can contribute to completeness, so upgrades can still use tracks already present. Library scans are not treated as new full-release downloads. No previously imported file is removed or repaired automatically.
+
+If enough files exist but some expected identities are uncertain, the release is held for review rather than calling uncertainty a definitive non-match. Explicit `no_match`, inference/configuration failures, request-size failures, and definite missing-track shortfalls are true errors. They set the queue status to Error (red). Review mode alone, low confidence, and ambiguous identity remain Warning (yellow). Failed import operations are also marked red. Manual Import remains available for both colors; error rows are not automatically selected.
+
+AI results now carry a status and IsError flag through saved previews. Use Retry AI after upgrading to reclassify old held results. Model request/response schema, current model default, and endpoint are unchanged. Changing a compatible model only requires loading it in LM Studio and updating LIDARR_AI_MODEL to the exact server model ID in the Docker configuration.

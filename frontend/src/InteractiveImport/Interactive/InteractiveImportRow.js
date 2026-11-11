@@ -59,7 +59,7 @@ class InteractiveImportRow extends Component {
       tracks.length &&
       quality &&
       size > 0 &&
-      (!aiMatch || aiMatch.accepted)
+      (!aiMatch || (aiMatch.accepted && !aiMatch.isError))
     ) {
       this.props.onSelectedChange({ id, value: true });
     }

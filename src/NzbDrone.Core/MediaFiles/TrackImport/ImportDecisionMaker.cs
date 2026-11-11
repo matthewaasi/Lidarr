@@ -176,6 +176,15 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                     EnsureData(release);
                     release.NewDownload = config.NewDownload;
 
+                    if (config.NewDownload && release.TrackMapping?.MBExtra?.Count > 0 &&
+                        release.TrackCount < release.TrackMapping.Mapping.Count + release.TrackMapping.MBExtra.Count)
+                    {
+                        foreach (var file in release.LocalTracks.Where(f => f.AiMatch != null))
+                        {
+                            file.AiMatch.IsError = true;
+                        }
+                    }
+
                     albumDecisions.Add(GetDecision(release, itemInfo.DownloadClientItem));
                 }
 

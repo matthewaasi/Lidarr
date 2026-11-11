@@ -145,7 +145,7 @@ namespace NzbDrone.Core.Download
 
                 if (firstResult.Result == ImportResultType.Rejected && firstResult.ImportDecision.Item == null)
                 {
-                    trackedDownload.Warn(new TrackedDownloadStatusMessage(firstResult.Errors.First(), new List<string>()));
+                    trackedDownload.Error(new TrackedDownloadStatusMessage(firstResult.Errors.First(), new List<string>()));
 
                     return;
                 }
@@ -171,7 +171,14 @@ namespace NzbDrone.Core.Download
 
                 if (statusMessages.Any())
                 {
-                    trackedDownload.Warn(statusMessages.ToArray());
+                    if (importResults.Any(r => r.ImportDecision.Item?.AiMatch?.IsError == true || r.Result == ImportResultType.Skipped))
+                    {
+                        trackedDownload.Error(statusMessages.ToArray());
+                    }
+                    else
+                    {
+                        trackedDownload.Warn(statusMessages.ToArray());
+                    }
                 }
 
                 // Publish event to notify album was imported incomplete
@@ -189,6 +196,12 @@ namespace NzbDrone.Core.Download
 
         public bool VerifyImport(TrackedDownload trackedDownload, List<ImportResult> importResults)
         {
+            if (importResults.Any(r => r.Result != ImportResultType.Imported && r.ImportDecision.Item?.AiMatch?.IsError == true))
+            {
+                // A fulfilled album track count must not hide an additional failed/non-matching file.
+                return false;
+            }
+
             var allTracksImported =
                 (importResults.Any() && importResults.All(c => c.Result == ImportResultType.Imported)) ||
                 importResults.Where(c => c.Result == ImportResultType.Imported)
