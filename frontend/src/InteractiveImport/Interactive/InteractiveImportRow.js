@@ -382,6 +382,7 @@ class InteractiveImportRow extends Component {
                   <ul>
                     {aiMatch ? (
                       <li>
+                        {aiMatch.isCached ? <div>{translate('SavedAiMatchingResult')}</div> : null}
                         <div>{aiMatch.reason}</div>
                         {aiMatch.model ? <div>Model: {aiMatch.model}</div> : null}
                         {aiMatch.proposed ? <div>AI confidence: {Math.round(aiMatch.confidence * 100)}%</div> : null}

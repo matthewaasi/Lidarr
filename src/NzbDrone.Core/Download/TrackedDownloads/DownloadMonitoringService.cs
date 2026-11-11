@@ -57,7 +57,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _manageCommandQueue.Push(new RefreshMonitoredDownloadsCommand(), CommandPriority.High);
         }
 
-        private void Refresh()
+        private void Refresh(bool retryAiMatching = false)
         {
             _refreshDebounce.Pause();
             try
@@ -68,7 +68,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
                 foreach (var downloadClient in downloadClients)
                 {
-                    var clientTrackedDownloads = ProcessClientDownloads(downloadClient);
+                    var clientTrackedDownloads = ProcessClientDownloads(downloadClient, retryAiMatching);
 
                     trackedDownloads.AddRange(clientTrackedDownloads.Where(DownloadIsTrackable));
                 }
@@ -83,7 +83,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             }
         }
 
-        private List<TrackedDownload> ProcessClientDownloads(IDownloadClient downloadClient)
+        private List<TrackedDownload> ProcessClientDownloads(IDownloadClient downloadClient, bool retryAiMatching)
         {
             var downloadClientItems = new List<DownloadClientItem>();
             var trackedDownloads = new List<TrackedDownload>();
@@ -102,14 +102,14 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
             foreach (var downloadItem in downloadClientItems)
             {
-                var item = ProcessClientItem(downloadClient, downloadItem);
+                var item = ProcessClientItem(downloadClient, downloadItem, retryAiMatching);
                 trackedDownloads.AddIfNotNull(item);
             }
 
             return trackedDownloads;
         }
 
-        private TrackedDownload ProcessClientItem(IDownloadClient downloadClient, DownloadClientItem downloadItem)
+        private TrackedDownload ProcessClientItem(IDownloadClient downloadClient, DownloadClientItem downloadItem, bool retryAiMatching)
         {
             TrackedDownload trackedDownload = null;
 
@@ -118,6 +118,13 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                 trackedDownload =
                     _trackedDownloadService.TrackDownload((DownloadClientDefinition)downloadClient.Definition,
                         downloadItem);
+
+                if (retryAiMatching && trackedDownload?.State == TrackedDownloadState.ImportFailed &&
+                    downloadItem.Status == DownloadItemStatus.Completed)
+                {
+                    // Only an explicit Queue Refresh retries a held/rejected import. Scheduled polling does not.
+                    trackedDownload.State = TrackedDownloadState.Downloading;
+                }
 
                 if (trackedDownload is { State: TrackedDownloadState.Downloading or TrackedDownloadState.ImportBlocked })
                 {
@@ -154,7 +161,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         public void Execute(RefreshMonitoredDownloadsCommand message)
         {
-            Refresh();
+            Refresh(message.RetryAiMatching);
         }
 
         public void Execute(CheckForFinishedDownloadCommand message)

@@ -1130,6 +1130,7 @@
   "SearchForMissing": "Search for Missing",
   "SearchForMonitoredAlbums": "Search for monitored albums",
   "SearchMonitored": "Search Monitored",
+  "SavedAiMatchingResult": "Saved AI result — no new matching request",
   "SearchMonitoredReleaseType": "Search {count} monitored releases in {releaseType}",
   "SearchingMonitoredReleaseType": "Searching monitored releases in {releaseType}",
   "NoMonitoredReleasesInGroup": "No monitored releases in this section",

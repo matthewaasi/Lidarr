@@ -120,7 +120,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
                     NewDownload = true,
                     SingleRelease = false,
                     IncludeExisting = !replaceExistingFiles,
-                    AddNewArtists = false
+                    AddNewArtists = false,
+                    UseCachedIdentificationOnly = true
                 };
 
                 var decisions = _importDecisionMaker.GetImportDecisions(files, null, null, config);
@@ -176,12 +177,6 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
 
             var artistFiles = _diskScanService.GetAudioFiles(folder).ToList();
 
-            if (artist == null && artistFiles.Count > 100)
-            {
-                _logger.Warn("Unable to determine artist from folder name and found more than 100 files. Skipping parsing");
-                return ProcessDownloadDirectory(folder, artistFiles);
-            }
-
             var idOverrides = new IdentificationOverrides
             {
                 Artist = artist
@@ -197,7 +192,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
                 NewDownload = true,
                 SingleRelease = false,
                 IncludeExisting = !replaceExistingFiles,
-                AddNewArtists = false
+                AddNewArtists = false,
+                UseCachedIdentificationOnly = true
             };
 
             var decisions = _importDecisionMaker.GetImportDecisions(artistFiles, idOverrides, itemInfo, config);

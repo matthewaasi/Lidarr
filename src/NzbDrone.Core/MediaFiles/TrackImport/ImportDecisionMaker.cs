@@ -41,6 +41,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         public bool SingleRelease { get; set; }
         public bool IncludeExisting { get; set; }
         public bool AddNewArtists { get; set; }
+        public bool UseCachedIdentificationOnly { get; set; }
     }
 
     public class ImportDecisionMaker : IMakeImportDecision
@@ -51,6 +52,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         private readonly IAudioTagService _audioTagService;
         private readonly IAugmentingService _augmentingService;
         private readonly IIdentificationService _identificationService;
+        private readonly IAiImportDecisionCache _aiDecisionCache;
         private readonly IRootFolderService _rootFolderService;
         private readonly IQualityProfileService _qualityProfileService;
         private readonly Logger _logger;
@@ -61,6 +63,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                                    IAudioTagService audioTagService,
                                    IAugmentingService augmentingService,
                                    IIdentificationService identificationService,
+                                   IAiImportDecisionCache aiDecisionCache,
                                    IRootFolderService rootFolderService,
                                    IQualityProfileService qualityProfileService,
                                    Logger logger)
@@ -71,6 +74,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
             _audioTagService = audioTagService;
             _augmentingService = augmentingService;
             _identificationService = identificationService;
+            _aiDecisionCache = aiDecisionCache;
             _rootFolderService = rootFolderService;
             _qualityProfileService = qualityProfileService;
             _logger = logger;
@@ -150,6 +154,12 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             localTracks.ForEach(x => x.ExistingFile = !config.NewDownload);
 
+            if (config.UseCachedIdentificationOnly)
+            {
+                decisions.AddRange(_aiDecisionCache.Read(localTracks));
+                return decisions;
+            }
+
             var releases = _identificationService.Identify(localTracks, idOverrides, config);
 
             var albums = releases.GroupBy(x => x.AlbumRelease?.Album?.Value.ForeignAlbumId);
@@ -194,6 +204,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                 }
             }
 
+            _aiDecisionCache.Save(decisions);
             return decisions;
         }
 

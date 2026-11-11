@@ -212,3 +212,24 @@ test('UI disables empty/busy sections and renders queue failures as an alert', (
     assert.ok(rendered.find((element) => element.props.role === 'alert'));
   }
 });
+
+test('Queue Refresh explicitly requests AI retry rather than just scheduled polling', () => {
+  const QueueConnector = load('Activity/Queue/QueueConnector.js', {
+    'react-redux': { connect: () => (component) => component },
+    'Commands/commandNames': names,
+    'Components/withCurrentPage': (component) => component,
+    'Store/Actions/albumActions': {},
+    'Store/Actions/commandActions': {},
+    'Store/Actions/queueActions': {},
+    'Store/Selectors/createClientSideCollectionSelector': {},
+    'Store/Selectors/createCommandExecutingSelector': stub,
+    'Utilities/Object/hasDifferentItems': stub,
+    'Utilities/Object/selectUniqueIds': stub,
+    'Utilities/pagePopulator': {},
+    './Queue': stub
+  }).default;
+  let sent;
+  new QueueConnector({ executeCommand: (payload) => { sent = payload; } }).onRefreshPress();
+  assert.equal(sent.name, names.REFRESH_MONITORED_DOWNLOADS);
+  assert.equal(sent.retryAiMatching, true);
+});

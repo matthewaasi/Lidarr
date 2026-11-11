@@ -2,6 +2,15 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.3 — Saved AI previews and explicit retry
+
+- Opening Manual Import now reads saved AI proposals without making an inference request; explicit Map Tracks still requests fresh identification.
+- Added atomic persistent preview caching with file size/mtime and metadata validation; automatic imports do not reuse preview decisions.
+- In this release only, Queue Refresh explicitly retries completed held downloads. This temporary control behavior is replaced by a dedicated button in ai.4.
+- Kept scheduled polling from forcing retries of held identifications and excluded imported, ignored, failed-download and active-import items.
+
+**Recorded verification:** 52 backend and 12 frontend tests passed.
+
 ## 3.2.1.5196-ai.2 — Native release-type search
 
 - Added native search buttons to artist-page release-type headers, including collapsed sections.

@@ -396,6 +396,23 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport
         }
 
         [Test]
+        public void cached_manual_preview_must_not_run_identification_or_overwrite_the_cache()
+        {
+            GivenAudioFiles(new[] { @"C:\Test\preview.flac".AsOsAgnostic() });
+            _idConfig.UseCachedIdentificationOnly = true;
+            Mocker.GetMock<IAiImportDecisionCache>()
+                .Setup(c => c.Read(It.IsAny<List<LocalTrack>>()))
+                .Returns((List<LocalTrack> files) => files.Select(f => new ImportDecision<LocalTrack>(f, new Rejection("Saved proposal"))).ToList());
+
+            var decisions = Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+
+            decisions.Should().HaveCount(1);
+            decisions[0].Rejections[0].Reason.Should().Be("Saved proposal");
+            Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Never());
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Save(It.IsAny<List<ImportDecision<LocalTrack>>>()), Times.Never());
+        }
+
+        [Test]
         public void should_return_a_decision_when_exception_is_caught()
         {
             Mocker.GetMock<IAugmentingService>()

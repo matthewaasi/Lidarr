@@ -144,7 +144,8 @@ class QueueConnector extends Component {
 
   onRefreshPress = () => {
     this.props.executeCommand({
-      name: commandNames.REFRESH_MONITORED_DOWNLOADS
+      name: commandNames.REFRESH_MONITORED_DOWNLOADS,
+      retryAiMatching: true
     });
   };
 

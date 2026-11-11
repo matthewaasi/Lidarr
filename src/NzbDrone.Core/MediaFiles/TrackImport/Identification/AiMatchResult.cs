@@ -6,6 +6,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
     {
         public bool Accepted { get; set; }
         public bool Proposed { get; set; }
+        public bool IsCached { get; set; }
         public string Reason { get; set; }
         public double Confidence { get; set; }
         public string Model { get; set; }
