@@ -1,0 +1,78 @@
+using System;
+using System.Globalization;
+
+namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
+{
+    public interface ILmStudioSettingsProvider
+    {
+        LmStudioSettings GetSettings();
+    }
+
+    public class LmStudioSettings
+    {
+        public string BaseUrl { get; set; }
+        public string Model { get; set; }
+        public string ApiKey { get; set; }
+        public string ReasoningEffort { get; set; } = "none";
+        public int MaxOutputTokens { get; set; } = 4096;
+        public bool Automatic { get; set; }
+        public int TimeoutSeconds { get; set; } = 180;
+        public double MinimumConfidence { get; set; } = 0.95;
+        public int MaxRequestCharacters { get; set; } = 180000;
+
+        public void Validate()
+        {
+            if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+                !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+            {
+                throw new ArgumentException("Set LIDARR_AI_BASE_URL to the LM Studio HTTP(S) API base URL, including /v1");
+            }
+
+            if (string.IsNullOrWhiteSpace(Model))
+            {
+                throw new ArgumentException("Set LIDARR_AI_MODEL to the model identifier shown in LM Studio");
+            }
+
+            if (TimeoutSeconds < 1 || TimeoutSeconds > 1800 ||
+                !double.IsFinite(MinimumConfidence) || MinimumConfidence < 0 || MinimumConfidence > 1 ||
+                MaxRequestCharacters < 1000 || MaxRequestCharacters > 1000000 || MaxOutputTokens < 64 || MaxOutputTokens > 32768)
+            {
+                throw new ArgumentException("Invalid AI timeout, confidence, or request size setting");
+            }
+
+            if (ReasoningEffort != "none" && ReasoningEffort != "minimal" && ReasoningEffort != "low" &&
+                ReasoningEffort != "medium" && ReasoningEffort != "high" && ReasoningEffort != "xhigh")
+            {
+                throw new ArgumentException("Invalid LIDARR_AI_REASONING_EFFORT; use none, minimal, low, medium, high or xhigh");
+            }
+        }
+    }
+
+    public class LmStudioSettingsProvider : ILmStudioSettingsProvider
+    {
+        public LmStudioSettings GetSettings()
+        {
+            var mode = Environment.GetEnvironmentVariable("LIDARR_AI_MODE") ?? "Review";
+            if (!mode.Equals("Review", StringComparison.OrdinalIgnoreCase) && !mode.Equals("Automatic", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("LIDARR_AI_MODE must be Review or Automatic");
+            }
+
+            var settings = new LmStudioSettings
+            {
+                BaseUrl = Environment.GetEnvironmentVariable("LIDARR_AI_BASE_URL"),
+                Model = Environment.GetEnvironmentVariable("LIDARR_AI_MODEL"),
+                ApiKey = Environment.GetEnvironmentVariable("LIDARR_AI_API_KEY"),
+                ReasoningEffort = Environment.GetEnvironmentVariable("LIDARR_AI_REASONING_EFFORT") ?? "none",
+                MaxOutputTokens = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MAX_OUTPUT_TOKENS") ?? "4096", CultureInfo.InvariantCulture),
+                Automatic = mode.Equals("Automatic", StringComparison.OrdinalIgnoreCase),
+                TimeoutSeconds = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_TIMEOUT_SECONDS") ?? "180", CultureInfo.InvariantCulture),
+                MinimumConfidence = double.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MIN_CONFIDENCE") ?? "0.95", CultureInfo.InvariantCulture),
+                MaxRequestCharacters = int.Parse(Environment.GetEnvironmentVariable("LIDARR_AI_MAX_REQUEST_CHARACTERS") ?? "180000", CultureInfo.InvariantCulture)
+            };
+            settings.Validate();
+            return settings;
+        }
+    }
+}

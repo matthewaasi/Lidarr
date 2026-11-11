@@ -1,0 +1,12 @@
+.git
+node_modules
+_output
+_tests
+_temp
+_artifacts
+**/bin
+**/obj
+*.tar
+*.tar.gz
+*.zip
+TestResults
