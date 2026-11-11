@@ -36,7 +36,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Specifications
             {
                 dist = item.Distance.NormalizedDistance();
                 reasons = item.Distance.Reasons;
-                if (dist > AlbumThreshold)
+                if (dist > AlbumThreshold + 1e-9)
                 {
                     _logger.Debug($"Album match is not close enough: {dist} vs {AlbumThreshold} {reasons}. Skipping {item}");
                     return Decision.Reject($"Album match is not close enough: {1 - dist:P1} vs {1 - AlbumThreshold:P0} {reasons}");
@@ -52,7 +52,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Specifications
                 {
                     var maxTrackDist = worstTrackMatch.Distance.NormalizedDistance();
                     var trackReasons = worstTrackMatch.Distance.Reasons;
-                    if (maxTrackDist > TrackThreshold)
+                    if (maxTrackDist > TrackThreshold + 1e-9)
                     {
                         _logger.Debug($"Worst track match: {maxTrackDist} vs {TrackThreshold} {trackReasons}. Skipping {item}");
                         return Decision.Reject($"Worst track match: {1 - maxTrackDist:P1} vs {1 - TrackThreshold:P0} {trackReasons}");
@@ -66,7 +66,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Specifications
                 // get album distance ignoring whether tracks are missing
                 dist = item.Distance.NormalizedDistanceExcluding(new List<string> { "missing_tracks", "unmatched_tracks" });
                 reasons = item.Distance.Reasons;
-                if (dist > AlbumThreshold)
+                if (dist > AlbumThreshold + 1e-9)
                 {
                     _logger.Debug($"Album match is not close enough: {dist} vs {AlbumThreshold} {reasons}. Skipping {item}");
                     return Decision.Reject($"Album match is not close enough: {1 - dist:P1} vs {1 - AlbumThreshold:P0} {reasons}");

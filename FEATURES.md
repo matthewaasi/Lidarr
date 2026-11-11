@@ -1,4 +1,4 @@
-# Features — 3.2.1.5196-ai.9
+# Features — 3.2.1.5196-ai.10
 
 - LM Studio album/track identification with Review and Automatic modes, strict result validation and configurable request settings.
 - Native release-type search buttons on artist pages.
@@ -6,7 +6,7 @@
 - Retry Matching is separate from Refresh; unavailable-provider warning spam is suppressed without deleting configuration.
 - Complete-release protection and red errors versus yellow review warnings.
 - Bounded, staged AI requests and adaptive context/output-limit subdivision.
-- Settings-selectable Original and LM Studio identification with native score and AI settings.
+- Settings-selectable Original, LM Studio, and native-first/AI-fallback identification with native score and AI settings.
 - Optional native Unique Singles cleanup, a separate Singles Review page, and monitoring restoration when coverage disappears.
 - Queue AI disposition summary and configurable scheduled refresh interval.
 - Manual track selection works when no release was identified.

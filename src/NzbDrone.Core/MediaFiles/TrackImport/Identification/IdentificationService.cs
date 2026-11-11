@@ -200,6 +200,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             localAlbumRelease.AiMatch = null;
             localAlbumRelease.LocalTracks.ForEach(t => t.AiMatch = null);
             var fingerprinted = false;
+            var hybrid = _configService.MatchingEngine == "Hybrid";
 
             var candidateReleases = _candidateService.GetDbCandidatesFromTags(localAlbumRelease, idOverrides, config.IncludeExisting);
 
@@ -224,7 +225,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             if (candidateReleases.Count == 0)
             {
-                if (_configService.MatchingEngine != "Original")
+                if (_configService.MatchingEngine != "Original" && !(hybrid && config.UseCachedIdentificationOnly))
                 {
                     _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, new List<LocalTrack>());
                 }
@@ -253,7 +254,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             _logger.Debug($"Retrieved {allLocalTracks.Count} possible tracks in {watch.ElapsedMilliseconds}ms");
 
-            if (_configService.MatchingEngine != "Original")
+            if (_configService.MatchingEngine != "Original" && !hybrid)
             {
                 _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, allLocalTracks);
                 return;
@@ -275,6 +276,17 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
                 _fingerprintingService.Lookup(allLocalTracks, 0.5);
                 GetBestRelease(localAlbumRelease, candidateReleases, allLocalTracks);
+            }
+
+            if (hybrid && !NativeMatchPolicy.IsAccepted(localAlbumRelease, config.NewDownload, _configService, _logger))
+            {
+                if (!config.UseCachedIdentificationOnly)
+                {
+                    _logger.Info("Native identification did not pass; trying LM Studio for the whole release");
+                    _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, allLocalTracks);
+                }
+
+                return;
             }
 
             localAlbumRelease.PopulateMatch();

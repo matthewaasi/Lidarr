@@ -468,6 +468,45 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport
             Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Once());
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void hybrid_preview_identifies_natively_then_reads_cache_only_for_unresolved_releases(bool nativeAccepted)
+        {
+            GivenAudioFiles(new[] { @"C:\Test\hybrid-preview.flac".AsOsAgnostic() });
+            _idConfig.UseCachedIdentificationOnly = true;
+            _idConfig.NewDownload = true;
+            Mocker.GetMock<IConfigService>().SetupGet(c => c.MatchingEngine).Returns("Hybrid");
+            Mocker.GetMock<IIdentificationService>()
+                .Setup(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()))
+                .Returns((List<LocalTrack> files, IdentificationOverrides overrides, ImportDecisionMakerConfig config) =>
+                {
+                    var track = new Track { Id = 123, AlbumReleaseId = _albumRelease.Id };
+                    var mapping = new TrackMapping { LocalExtra = new List<LocalTrack>(), MBExtra = new List<Track>() };
+                    mapping.Mapping[files[0]] = Tuple.Create(track, new Distance());
+                    if (!nativeAccepted)
+                    {
+                        mapping.MBExtra.Add(new Track { Id = 124 });
+                    }
+
+                    var release = new LocalAlbumRelease(files) { AlbumRelease = _albumRelease, Distance = new Distance(), TrackMapping = mapping, ExistingTracks = new List<LocalTrack>() };
+                    release.PopulateMatch();
+                    return new List<LocalAlbumRelease> { release };
+                });
+            Mocker.GetMock<IAiImportDecisionCache>().Setup(c => c.Read(It.IsAny<List<LocalTrack>>()))
+                .Returns((List<LocalTrack> files) => files.Select(f => new ImportDecision<LocalTrack>(f, new Rejection("Saved AI review"))).ToList());
+
+            var result = Subject.GetImportDecisions(_fileInfos, _idOverrides, null, _idConfig);
+            Assert.That(result.Count, Is.EqualTo(1));
+            if (!nativeAccepted)
+            {
+                Assert.That(result[0].Rejections[0].Reason, Is.EqualTo("Saved AI review"));
+            }
+
+            Mocker.GetMock<IIdentificationService>().Verify(s => s.Identify(It.IsAny<List<LocalTrack>>(), It.IsAny<IdentificationOverrides>(), It.IsAny<ImportDecisionMakerConfig>()), Times.Once());
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Read(It.IsAny<List<LocalTrack>>()), nativeAccepted ? Times.Never() : Times.Once());
+            Mocker.GetMock<IAiImportDecisionCache>().Verify(c => c.Save(It.IsAny<List<ImportDecision<LocalTrack>>>()), Times.Never());
+        }
+
         [Test]
         public void should_return_a_decision_when_exception_is_caught()
         {

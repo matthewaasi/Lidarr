@@ -26,15 +26,15 @@ namespace Lidarr.Api.V1.Config
         public IdentificationConfigController(IConfigService config)
             : base(config)
         {
-            SharedValidator.RuleFor(x => x.MatchingEngine).Must(x => x == "Original" || x == "LmStudio");
+            SharedValidator.RuleFor(x => x.MatchingEngine).Must(x => x == "Original" || x == "LmStudio" || x == "Hybrid");
             SharedValidator.RuleFor(x => x.OriginalAlbumMatchPercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.OriginalTrackMatchPercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.LmStudioConfidencePercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.LmStudioMode).Must(x => x == "Review" || x == "Automatic");
             SharedValidator.RuleFor(x => x.LmStudioBaseUrl).Must(x => Uri.TryCreate(x, UriKind.Absolute, out var uri) &&
                 (uri.Scheme == "http" || uri.Scheme == "https") && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment))
-                .When(x => x.MatchingEngine == "LmStudio");
-            SharedValidator.RuleFor(x => x.LmStudioModel).NotEmpty().When(x => x.MatchingEngine == "LmStudio");
+                .When(x => x.MatchingEngine == "LmStudio" || x.MatchingEngine == "Hybrid");
+            SharedValidator.RuleFor(x => x.LmStudioModel).NotEmpty().When(x => x.MatchingEngine == "LmStudio" || x.MatchingEngine == "Hybrid");
         }
 
         protected override IdentificationConfigResource ToResource(IConfigService model)

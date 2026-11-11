@@ -158,13 +158,24 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             localTracks.ForEach(x => x.ExistingFile = !config.NewDownload);
 
-            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine != "Original")
+            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine != "Original" && _configService.MatchingEngine != "Hybrid")
             {
                 decisions.AddRange(_aiDecisionCache.Read(localTracks));
                 return decisions;
             }
 
             var releases = _identificationService.Identify(localTracks, idOverrides, config);
+
+            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine == "Hybrid")
+            {
+                var unresolved = releases.Where(r => !NativeMatchPolicy.IsAccepted(r, config.NewDownload, _configService, _logger)).ToList();
+                foreach (var release in unresolved)
+                {
+                    decisions.AddRange(_aiDecisionCache.Read(release.LocalTracks));
+                }
+
+                releases = releases.Except(unresolved).ToList();
+            }
 
             var albums = releases.GroupBy(x => x.AlbumRelease?.Album?.Value.ForeignAlbumId);
 
@@ -217,7 +228,10 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
                 }
             }
 
-            _aiDecisionCache.Save(decisions);
+            if (!config.UseCachedIdentificationOnly)
+            {
+                _aiDecisionCache.Save(decisions);
+            }
             return decisions;
         }
 

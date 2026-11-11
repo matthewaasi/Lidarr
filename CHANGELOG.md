@@ -2,6 +2,16 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.10 — Native-first identification with AI fallback
+
+- Added the selectable Lidarr first, LM Studio fallback engine while preserving existing engine selections until changed in Settings.
+- Runs native matching and allowed fingerprinting first; successful identification and new-download completeness require no AI request.
+- Sends a failed identification’s whole release to LM Studio under its existing confidence and Review/Automatic settings.
+- Keeps quality, duplicate and path/import failures from triggering AI fallback; an AI error never restores a weak native result.
+- Manual preview tries native matching and reuses saved AI results without calling the model. Explicit mapping and Retry Matching perform fresh hybrid identification; no new migration.
+
+**Recorded verification:** 87 backend and 33 frontend tests passed. Production frontend and Linux publishing passed; backend analyzers were disabled for this build.
+
 ## 3.2.1.5196-ai.9 — Manual track-picker recovery
 
 - Fixed “No tracks were found for the selected album” when matching has not assigned a release.

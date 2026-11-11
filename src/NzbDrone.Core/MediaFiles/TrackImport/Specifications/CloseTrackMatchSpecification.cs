@@ -28,7 +28,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Specifications
             var dist = item.Distance.NormalizedDistance();
             var reasons = item.Distance.Reasons;
 
-            if (dist > Threshold)
+            if (dist > Threshold + 1e-9)
             {
                 _logger.Debug($"Track match is not close enough: {dist} vs {Threshold} {reasons}. Skipping {item}");
                 return Decision.Reject($"Track match is not close enough: {1 - dist:P1} vs {1 - Threshold:P0} {reasons}");
