@@ -14,6 +14,35 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
         public DateTime Updated { get; set; }
     }
 
+    public class AuditFindingSelection
+    {
+        public int Id { get; set; }
+        public string EvidenceKey { get; set; }
+    }
+
+    public class AuditFileDeletion
+    {
+        public List<AuditFindingSelection> Findings { get; set; }
+        public int[] FileIds { get; set; }
+        public string PreviewKey { get; set; }
+        public bool ConfirmAllCopies { get; set; }
+    }
+
+    public class AuditDeletionPreview
+    {
+        public List<AuditFile> Files { get; set; }
+        public long TotalBytes { get; set; }
+        public List<AuditDuplicateDeletionGroup> DuplicateGroups { get; set; }
+        public string PreviewKey { get; set; }
+    }
+
+    public class AuditDuplicateDeletionGroup
+    {
+        public int FindingId { get; set; }
+        public string EvidenceKey { get; set; }
+        public List<AuditFile> Files { get; set; }
+    }
+
     public class AuditEvidence
     {
         public string Confidence { get; set; }

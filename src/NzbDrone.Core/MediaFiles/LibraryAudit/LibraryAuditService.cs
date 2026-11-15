@@ -20,11 +20,16 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
     {
         List<LibraryAuditFinding> Findings();
         void Decide(int id, string evidenceKey, string action);
+        void DeleteFindings(int[] ids);
+        void DeleteAllFindings();
+        void DeleteFindingFiles(AuditFileDeletion selection);
+        AuditDeletionPreview PreviewFindingFileDeletion(AuditFileDeletion selection);
     }
 
     public class LibraryAuditService : ILibraryAuditService, IExecute<ScanLibraryAuditCommand>
     {
         private readonly IMediaFileRepository _files;
+        private readonly IDeleteMediaFiles _deletion;
         private readonly ITrackService _tracks;
         private readonly IAudioTagService _tags;
         private readonly IDiskProvider _disk;
@@ -33,9 +38,10 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
         private readonly IFingerprintingService _fingerprints;
         private readonly object _gate = new object();
 
-        public LibraryAuditService(IMediaFileRepository files, ITrackService tracks, IAudioTagService tags, IDiskProvider disk, ILibraryAuditRepository repository, IFingerprintingService fingerprints, Logger logger)
+        public LibraryAuditService(IMediaFileRepository files, ITrackService tracks, IAudioTagService tags, IDiskProvider disk, ILibraryAuditRepository repository, IFingerprintingService fingerprints, IDeleteMediaFiles deletion, Logger logger)
         {
             _files = files;
+            _deletion = deletion;
             _tracks = tracks;
             _tags = tags;
             _disk = disk;
@@ -45,6 +51,146 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
         }
 
         public List<LibraryAuditFinding> Findings() => _repository.All().OrderByDescending(x => x.Updated).ThenBy(x => x.Id).ToList();
+
+        public void DeleteFindings(int[] ids)
+        {
+            if (ids == null || ids.Length == 0 || ids.Any(id => id <= 0))
+            {
+                throw new BadRequestException("Select at least one valid audit finding.");
+            }
+
+            lock (_gate)
+            {
+                _repository.DeleteMany(ids.Distinct());
+            }
+        }
+
+        public void DeleteAllFindings()
+        {
+            lock (_gate)
+            {
+                _repository.Purge();
+            }
+        }
+
+        public AuditDeletionPreview PreviewFindingFileDeletion(AuditFileDeletion selection)
+        {
+            lock (_gate)
+            {
+                return BuildDeletionPreview(selection, out _);
+            }
+        }
+
+        private AuditDeletionPreview BuildDeletionPreview(AuditFileDeletion selection, out List<TrackFile> files)
+        {
+            if (selection?.Findings == null || selection.Findings.Count == 0 ||
+                selection.Findings.Any(x => x == null || x.Id <= 0 || string.IsNullOrWhiteSpace(x.EvidenceKey)) ||
+                selection.FileIds == null || selection.FileIds.Length == 0 || selection.FileIds.Any(id => id <= 0))
+            {
+                throw new BadRequestException("Select current audit findings and the specific files to delete.");
+            }
+
+            var evidenceFiles = new List<AuditFile>();
+            foreach (var selected in selection.Findings)
+            {
+                var row = _repository.Get(selected.Id);
+                if (row.EvidenceKey != selected.EvidenceKey || row.Status == "resolved")
+                {
+                    throw new BadRequestException("This finding has changed. Refresh and rescan before deleting files.");
+                }
+
+                evidenceFiles.AddRange(JsonConvert.DeserializeObject<AuditEvidence>(row.Evidence).Files);
+            }
+
+            files = new List<TrackFile>();
+            foreach (var id in selection.FileIds.Distinct())
+            {
+                var snapshots = evidenceFiles.Where(x => x.Id == id).ToList();
+                var file = _files.Find(id);
+                if (snapshots.Count == 0 || file == null || snapshots.Any(x => x.Path != file.Path))
+                {
+                    throw new BadRequestException("A selected file is missing, moved or outside these findings. Refresh and rescan before deleting files.");
+                }
+
+                try
+                {
+                    foreach (var snapshot in snapshots)
+                    {
+                        EnsureUnchanged(snapshot);
+                    }
+                }
+                catch (IOException)
+                {
+                    throw new BadRequestException("A selected file changed or is unavailable. Rescan before deleting files.");
+                }
+
+                files.Add(file);
+            }
+
+            var ids = selection.FileIds.ToHashSet();
+            var snapshotsById = evidenceFiles.GroupBy(x => x.Id).ToDictionary(x => x.Key, x => x.First());
+            var preview = new AuditDeletionPreview
+            {
+                Files = files.OrderBy(x => x.Id).Select(x => snapshotsById[x.Id]).ToList(),
+                TotalBytes = files.Sum(x => snapshotsById[x.Id].Size),
+                DuplicateGroups = _repository.All().Where(x => x.Kind == "duplicate" && x.Status != "resolved")
+                    .OrderBy(x => x.Id).Select(x => new AuditDuplicateDeletionGroup
+                    {
+                        FindingId = x.Id,
+                        EvidenceKey = x.EvidenceKey,
+                        Files = JsonConvert.DeserializeObject<AuditEvidence>(x.Evidence).Files
+                    }).Where(x => x.Files.Any(file => ids.Contains(file.Id)))
+                    .Select(x => new AuditDuplicateDeletionGroup
+                    {
+                        FindingId = x.FindingId,
+                        EvidenceKey = x.EvidenceKey,
+                        Files = x.Files.Where(file => ids.Contains(file.Id) ||
+                            _disk.FileExists(_files.Find(file.Id)?.Path ?? file.Path)).ToList()
+                    }).Where(x => x.Files.Count > 0 && x.Files.All(file => ids.Contains(file.Id))).ToList()
+            };
+            preview.PreviewKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { Findings = selection.Findings.OrderBy(x => x.Id), Preview = preview }))));
+            return preview;
+        }
+
+        public void DeleteFindingFiles(AuditFileDeletion selection)
+        {
+            lock (_gate)
+            {
+                var preview = BuildDeletionPreview(selection, out var files);
+                if (selection.PreviewKey != preview.PreviewKey)
+                {
+                    throw new BadRequestException("Review a fresh deletion preview before deleting files. The selection or audit evidence may have changed.");
+                }
+
+                if (preview.DuplicateGroups.Count > 0 && !selection.ConfirmAllCopies)
+                {
+                    throw new BadRequestException("This selection removes every copy in a duplicate group. Explicitly confirm deletion of all copies or keep at least one copy.");
+                }
+
+                // Validate the entire selection before deleting anything. Only explicit file IDs are removed.
+                try
+                {
+                    foreach (var file in files)
+                    {
+                        if (file.AlbumId > 0 && file.Artist?.Value != null)
+                        {
+                            _deletion.DeleteTrackFile(file.Artist.Value, file);
+                        }
+                        else
+                        {
+                            _deletion.DeleteTrackFile(file, "Unmapped_Files");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Audit file deletion stopped before completing the selection");
+                    throw new BadRequestException("File deletion stopped. Some selected files may already have been deleted. Findings were retained; refresh and rescan before retrying.");
+                }
+
+                _repository.DeleteMany(selection.Findings.Select(x => x.Id).Distinct());
+            }
+        }
 
         public void Decide(int id, string evidenceKey, string action)
         {
@@ -230,7 +376,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                         {
                             Confidence = "exact",
                             Reason = $"These files have identical complete-file SHA-256 hashes ({match.Key}). This proves identical file bytes, including tags; it does not identify the correct mix label.",
-                            SuggestedAction = "Review the album links before choosing which copies to retain. Audit never removes files or changes monitoring.",
+                            SuggestedAction = "Review the album links before choosing which copies to retain. Scans never remove files or change monitoring. File deletion requires explicit selection and confirmation.",
                             Files = verified.OrderBy(x => x.Id).ToList()
                         }));
                     }

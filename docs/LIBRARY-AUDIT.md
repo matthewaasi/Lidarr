@@ -2,7 +2,7 @@
 
 Open **Library → Audit** (`/library/audit`) and choose **Scan library**.
 
-The audit reads existing managed and unmapped track files and stores review findings. It never changes music files, track assignments, tags, monitoring, or downloads. Use each finding's album/unmapped-files link to review assignments with Lidarr's existing tools.
+The audit reads existing managed and unmapped track files and stores review findings. Scans never change music files, track assignments, tags, monitoring, or downloads. Optional file deletion is a separate, explicit action. Use each finding's album/unmapped-files link to review assignments with Lidarr's existing tools.
 
 ## Scan types
 
@@ -16,7 +16,7 @@ The audit cannot conclusively establish every mix label. Duration, title convent
 
 Findings include paths, available titles, actual/catalog duration, recording IDs, candidates, confidence, and suggested next steps. Filter by type and review status. Lists are paginated.
 
-**Ignore finding** previews the decision before saving. Ignores persist while evidence is unchanged. A later scan creates a fresh finding if relevant metadata, file size, modification time, or other evidence changes. **Return to review** reverses an ignore. No bulk deletion or automatic retagging is provided.
+**Ignore finding** previews the decision before saving. Ignores persist while evidence is unchanged. A later scan creates a fresh finding if relevant metadata, file size, modification time, or other evidence changes. **Return to review** reverses an ignore. Automatic retagging is not provided.
 
 A successful scan marks findings that are no longer detected as resolved for the selected scan types only. Read failures preserve prior evidence for affected files. Local-only scans do not resolve older fingerprint-supported findings. Refreshing a browser does not cancel a server-side command; progress remains available under System → Tasks.
 
@@ -33,3 +33,16 @@ Existing authentication and URL-base handling apply. Migration 83 adds `LibraryA
 Tests under `MediaFiles/LibraryAudit` cover version detection in both directions, ambiguous fingerprint associations, identical bytes versus equal size, file changes during inspection, unavailable evidence, persistence, ignore/restore, stale decisions, partial scans, and SQLite/PostgreSQL migration behavior.
 
 Build with the repository's normal .NET and frontend build processes. Include `SolutionDir` pointing at `src/` when directly building a project so the existing StyleCop configuration is loaded.
+
+
+## Deletion in ai.13
+
+Delete an individual finding, select multiple findings on the current page, or delete all findings. **Delete all findings removes saved audit records across every status and page; it never removes your library or music files.** Deleting a finding does not suppress future scans; use Ignore for unchanged evidence you want to keep out of Needs review.
+
+Individual and selected finding confirmations offer optional per-file checkboxes, initially unchecked. Choose exactly which copies to remove and select **Preview file deletion**. Review the exact paths, file count and total file size before confirming. Recycled files and hard links mean the total is not a guarantee of immediately recoverable disk space.
+
+The preview warns when every remaining audited copy in a duplicate group would be removed. A separate acknowledgement is required to proceed. The server checks pending and ignored duplicate findings outside the current view too, binds confirmation to the reviewed selection, and rejects stale previews. Changing the selection clears the preview and acknowledgement. Resolved findings and changed or moved files cannot authorize file removal.
+
+File removal follows Lidarr's recycle-bin settings and removes selected file records. Artist and album entries remain; monitoring is unchanged, so missing tracks can be downloaded again. On a partial failure, the batch stops and findings are retained. Some selected files may already be deleted; refresh and rescan before retrying.
+
+API: `DELETE /api/v1/libraryaudit/{id}`, `DELETE /api/v1/libraryaudit/bulk` (JSON ID array), and `DELETE /api/v1/libraryaudit/all` remove findings only. `POST /api/v1/libraryaudit/deletefiles/preview` accepts `{ "findings": [{ "id": 1, "evidenceKey": "..." }], "fileIds": [123] }`. The final `POST /api/v1/libraryaudit/deletefiles` additionally requires the returned `previewKey` and, when every copy is selected, `confirmAllCopies: true`.

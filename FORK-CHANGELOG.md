@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.1.5196-ai.13 — Audit deletion and file previews
+
+- Delete individual, selected or all audit findings; deleting all findings never removes the library or music files.
+- Optional exact-file selection with a server-validated preview of paths, unique file count and total size.
+- Additional acknowledgement before deleting every remaining audited copy in a duplicate group, including findings outside the current view.
+- Reject stale evidence and previews; retain findings and stop on partial file-deletion failures.
+- File removal uses existing Lidarr deletion and recycle-bin behavior; artist/album entries and monitoring remain unchanged.
+- See [release notes](docs/releases/ai.13.md) for installation and verification limits.
+
 ## 3.2.1.5196-ai.11 — Library Audit and faster library pages
 
 ### Added

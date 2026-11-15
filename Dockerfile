@@ -17,7 +17,7 @@ RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net8
     -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=3.2.1.5196 -p:AssemblyConfiguration=nightly-ai -o /out
 
 FROM ghcr.io/linuxserver/lidarr:nightly-3.2.1.5196-ls224@sha256:d1e3b469e618fa54b56bc487442efc231142096db3188cd3a4d5b1393b919e5e
-ARG FORK_VERSION=3.2.1.5196-ai.12
+ARG FORK_VERSION=3.2.1.5196-ai.13
 ARG VCS_REF=unknown
 RUN cp /app/lidarr/bin/fpcalc /tmp/lidarr-fpcalc \
     && rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin \

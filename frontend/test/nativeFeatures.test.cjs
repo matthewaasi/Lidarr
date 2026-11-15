@@ -19,7 +19,7 @@ function load(file, api) {
     'Components/Page/PageContentBody': 'body', 'Helpers/Props': { kinds: { DANGER: 'danger', WARNING: 'warning', SUCCESS: 'success' } },
     'Settings/FeatureSettings': { featureError: (xhr) => xhr.responseJSON?.message || 'Request failed' },
     'Utilities/createAjaxRequest': api,
-    './FeatureSettings.css': {}, './SinglesReview.css': {}
+    './LibraryAudit.css': {}, './FeatureSettings.css': {}, './SinglesReview.css': {}
   };
   vm.runInNewContext(code, { module, exports: module.exports, require: (id) => Object.hasOwn(imports, id) ? imports[id] : require(id), setTimeout, clearTimeout, console }, { filename });
   return module.exports.default;
@@ -184,4 +184,168 @@ test('hybrid matching can be selected and saved with required AI configuration',
   assert.equal(body.lmStudioMode, 'Review');
   calls[1].resolve({});
   await settle();
+});
+
+
+test('audit deletes only findings, with explicit all and selected scopes', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.onDelete();
+  assert.equal(calls.length, 0, 'confirmation is required');
+  instance.onSelect(12, true);
+  instance.onSelect(15, true);
+  instance.setState({ deleteTarget: 'selected' });
+  instance.onDelete();
+  assert.equal(calls[0].options.url, '/libraryaudit/bulk');
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.deepEqual(JSON.parse(calls[0].options.data), [12, 15]);
+  instance.onDelete();
+  assert.equal(calls.length, 1, 'duplicate deletion is guarded');
+  calls[0].reject({ responseJSON: { message: 'Try again' } });
+  await settle();
+  assert.equal(instance.state.error, 'Try again');
+  assert.equal(instance.state.selectedIds.length, 2, 'failed delete keeps selection');
+  instance.setState({ deleteTarget: 'all', status: 'ignored', kind: 'version', page: 3 });
+  instance.onDelete();
+  assert.equal(calls[1].options.url, '/libraryaudit/all', 'all ignores filters and pagination');
+  assert.equal(calls[1].options.data, undefined);
+  calls[1].resolve({});
+  await settle();
+  assert.equal(instance.state.selectedIds.length, 0);
+  assert.equal(instance.state.deleteTarget, null);
+  assert.match(calls[2].options.url, /^\/libraryaudit\?/);
+});
+
+test('audit individual delete and scan guard', () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ deleteTarget: 42, scanning: true });
+  instance.onDelete();
+  assert.equal(calls.length, 0);
+  instance.setState({ scanning: false });
+  instance.onDelete();
+  assert.equal(calls[0].options.url, '/libraryaudit/42');
+  assert.equal(calls[0].options.method, 'DELETE');
+});
+
+
+test('audit selection controls require confirmation and reset on navigation', () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ loading: false, records: [{ id: 7, evidence: { files: [], candidates: [] } }], total: 1 });
+  const findButton = (label) => nodes(instance.render(), (node) => node.type === 'button' && text(node).startsWith(label))[0];
+  assert.equal(findButton('Delete selected').props.disabled, true);
+  nodes(instance.render(), (node) => node.props?.['aria-label'] === 'Select all findings on this page')[0].props.onChange({ target: { checked: true } });
+  assert.equal(instance.state.selectedIds[0], 7);
+  findButton('Delete selected').props.onClick();
+  assert.equal(calls.length, 0);
+  assert.match(text(instance.render()), /Your library, music files, tags and monitoring are unchanged/);
+  findButton('Cancel').props.onClick();
+  assert.equal(instance.state.deleteTarget, null);
+  instance.onLoad();
+  assert.equal(instance.state.selectedIds.length, 0);
+});
+
+
+test('audit file removal is opt in, selects exact copies, and resets with scope', () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  const evidence = { files: [{ id: 11, path: '/music/keep.flac' }, { id: 12, path: '/music/remove.flac' }], candidates: [] };
+  instance.setState({ records: [{ id: 7, evidenceKey: 'current', evidence }], loading: true });
+  instance.onConfirmDelete(7);
+  assert.equal(instance.state.deleteFileIds.length, 0);
+  const fileCheckbox = nodes(instance.render(), (node) => node.type === 'input' && text(node).length === 0 && node.props.type === 'checkbox').at(-1);
+  fileCheckbox.props.onChange({ target: { checked: true } });
+  assert.equal(instance.state.deleteFileIds[0], 12);
+  assert.match(text(instance.render()), /Also delete 1 selected music files/);
+  instance.onDelete();
+  assert.equal(calls[0].options.url, '/libraryaudit/deletefiles/preview');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.data), { findings: [{ id: 7, evidenceKey: 'current' }], fileIds: [12] });
+  instance.onConfirmDelete('all');
+  assert.equal(instance.state.deleteFileIds.length, 0);
+  assert.doesNotMatch(text(instance.render()), /Also delete file:/);
+});
+
+test('audit bulk file deletion sends only selected findings and chosen files', () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ selectedIds: [7, 8], records: [7, 8, 9].map((id) => ({ id, evidenceKey: `key${id}`, evidence: { files: [], candidates: [] } })) });
+  instance.onConfirmDelete('selected');
+  instance.setState({ deleteFileIds: [12, 13] });
+  instance.onDelete();
+  assert.deepEqual(JSON.parse(calls[0].options.data), { findings: [{ id: 7, evidenceKey: 'key7' }, { id: 8, evidenceKey: 'key8' }], fileIds: [12, 13] });
+});
+
+
+test('audit preview lists exact paths and sizes and requires separate all-copy confirmation', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ loading: true, records: [{ id: 7, evidenceKey: 'current', evidence: { files: [{ id: 11 }, { id: 12 }], candidates: [] } }] });
+  instance.onConfirmDelete(7);
+  instance.onChangeDeleteFile(11, true);
+  instance.onChangeDeleteFile(12, true);
+  instance.onDelete();
+  const files = [{ id: 11, path: '/music/a.flac', size: 1048576 }, { id: 12, path: '/music/b.flac', size: 1048576 }];
+  const preview = { files, totalBytes: 2097152, previewKey: 'preview-key', duplicateGroups: [{ findingId: 99, files }] };
+  calls[0].resolve(preview);
+  await settle();
+  assert.equal(calls.length, 1, 'preview never starts deletion');
+  const output = text(instance.render());
+  assert.match(output, /2 files selected/);
+  assert.match(output, /2,097,152 bytes \(2.00 MiB\)/);
+  assert.match(output, /every audited copy/);
+  assert.match(output, /music\/a.flac/);
+  assert.match(output, /music\/b.flac/);
+  const confirm = nodes(instance.render(), (node) => node.type === 'button' && text(node) === 'Confirm delete findings and selected files')[0];
+  assert.equal(confirm.props.disabled, true);
+  instance.onDelete();
+  assert.equal(calls.length, 1, 'all-copy guard also applies in the handler');
+  const checkbox = nodes(instance.render(), (node) => node.type === 'input' && node.props.type === 'checkbox').at(-1);
+  checkbox.props.onChange({ target: { checked: true } });
+  instance.onDelete();
+  assert.equal(calls[1].options.url, '/libraryaudit/deletefiles');
+  assert.deepEqual(JSON.parse(calls[1].options.data), { findings: [{ id: 7, evidenceKey: 'current' }], fileIds: [11, 12], previewKey: 'preview-key', confirmAllCopies: true });
+});
+
+test('changing file selection invalidates the preview and all-copy acknowledgement', () => {
+  const { instance } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ deleteFileIds: [11, 12], deletionPreview: { previewKey: 'old' }, confirmAllCopies: true });
+  instance.onChangeDeleteFile(12, false);
+  assert.equal(instance.state.deletionPreview, null);
+  assert.equal(instance.state.confirmAllCopies, false);
+  assert.deepEqual(Array.from(instance.state.deleteFileIds), [11]);
+});
+
+test('failed audit preview keeps selection and never enables deletion', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ records: [{ id: 7, evidenceKey: 'current', evidence: { files: [], candidates: [] } }] });
+  instance.onConfirmDelete(7);
+  instance.onChangeDeleteFile(11, true);
+  instance.onDelete();
+  calls[0].reject({ responseJSON: { message: 'File changed' } });
+  await settle();
+  assert.equal(instance.state.deletionPreview, null);
+  assert.equal(instance.state.error, 'File changed');
+  assert.equal(instance.deleteButtonLabel(), 'Preview file deletion');
+  assert.equal(instance.state.deleteFileIds[0], 11);
+});
+
+
+test('ordinary file deletion reviews preview first and resets it after server rejection', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ records: [{ id: 7, evidenceKey: 'current', evidence: { files: [], candidates: [] } }] });
+  instance.onConfirmDelete(7);
+  instance.onChangeDeleteFile(11, true);
+  instance.onDelete();
+  calls[0].resolve({ files: [{ id: 11, path: '/music/remove.flac', size: 100 }], totalBytes: 100, previewKey: 'reviewed', duplicateGroups: [] });
+  await settle();
+  assert.equal(instance.deleteButtonLabel(), 'Confirm delete findings and selected files');
+  instance.onDelete();
+  assert.equal(calls[1].options.url, '/libraryaudit/deletefiles');
+  assert.equal(JSON.parse(calls[1].options.data).previewKey, 'reviewed');
+  assert.equal(JSON.parse(calls[1].options.data).confirmAllCopies, false);
+  calls[1].reject({ responseJSON: { message: 'Preview changed' } });
+  await settle();
+  assert.equal(instance.state.deletionPreview, null);
+  assert.equal(instance.state.confirmAllCopies, false);
+  assert.equal(instance.deleteButtonLabel(), 'Preview file deletion');
 });

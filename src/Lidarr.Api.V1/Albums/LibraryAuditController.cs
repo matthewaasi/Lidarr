@@ -51,6 +51,40 @@ namespace Lidarr.Api.V1.Albums
             };
         }
 
+        [HttpDelete("{id:int}")]
+        public object Delete(int id)
+        {
+            _service.DeleteFindings(new[] { id });
+            return new { };
+        }
+
+        [HttpDelete("bulk")]
+        public object DeleteSelected([FromBody] int[] ids)
+        {
+            _service.DeleteFindings(ids);
+            return new { };
+        }
+
+        [HttpDelete("all")]
+        public object DeleteAll()
+        {
+            _service.DeleteAllFindings();
+            return new { };
+        }
+
+        [HttpPost("deletefiles/preview")]
+        public object PreviewFiles([FromBody] AuditFileDeletion selection)
+        {
+            return _service.PreviewFindingFileDeletion(selection);
+        }
+
+        [HttpPost("deletefiles")]
+        public object DeleteFiles([FromBody] AuditFileDeletion selection)
+        {
+            _service.DeleteFindingFiles(selection);
+            return new { };
+        }
+
         [HttpPost("{id:int}")]
         public object Decide(int id, [FromBody] LibraryAuditAction action)
         {
