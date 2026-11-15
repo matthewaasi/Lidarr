@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { Component } from 'react';
 import Alert from 'Components/Alert';
 import Icon from 'Components/Icon';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
@@ -92,111 +92,135 @@ const columns = [
   }
 ];
 
-function InteractiveSearch(props) {
-  const {
-    searchPayload,
-    isFetching,
-    isPopulated,
-    error,
-    totalReleasesCount,
-    items,
-    selectedFilterKey,
-    filters,
-    customFilters,
-    sortKey,
-    sortDirection,
-    type,
-    longDateFormat,
-    timeFormat,
-    onSortPress,
-    onFilterSelect,
-    onGrabPress
-  } = props;
+class InteractiveSearch extends Component {
+  state = { page: 1 };
 
-  return (
-    <div>
-      <div className={styles.filterMenuContainer}>
-        <FilterMenu
-          alignMenu={align.RIGHT}
-          selectedFilterKey={selectedFilterKey}
-          filters={filters}
-          customFilters={customFilters}
-          buttonComponent={PageMenuButton}
-          filterModalConnectorComponent={InteractiveSearchFilterModalConnector}
-          filterModalConnectorComponentProps={{ type }}
-          onFilterSelect={onFilterSelect}
-        />
+  componentDidUpdate(previous) {
+    if (previous.sortKey !== this.props.sortKey || previous.sortDirection !== this.props.sortDirection || previous.selectedFilterKey !== this.props.selectedFilterKey || previous.type !== this.props.type) {
+      this.setState({ page: 1 });
+    }
+  }
+
+  render() {
+    const {
+      searchPayload,
+      searchProgress,
+      isFetching,
+      isPopulated,
+      error,
+      totalReleasesCount,
+      items,
+      selectedFilterKey,
+      filters,
+      customFilters,
+      sortKey,
+      sortDirection,
+      type,
+      longDateFormat,
+      timeFormat,
+      onSortPress,
+      onFilterSelect,
+      onGrabPress
+    } = this.props;
+    const pageCount = Math.max(1, Math.ceil(items.length / 100));
+    const page = Math.min(this.state.page, pageCount);
+    const pageItems = items.slice((page - 1) * 100, page * 100);
+
+    return (
+      <div>
+        <div className={styles.filterMenuContainer}>
+          <FilterMenu
+            alignMenu={align.RIGHT}
+            selectedFilterKey={selectedFilterKey}
+            filters={filters}
+            customFilters={customFilters}
+            buttonComponent={PageMenuButton}
+            filterModalConnectorComponent={InteractiveSearchFilterModalConnector}
+            filterModalConnectorComponentProps={{ type }}
+            onFilterSelect={onFilterSelect}
+          />
+        </div>
+
+        {
+          isFetching ? <div>
+            <LoadingIndicator />
+            <p role="status">{searchProgress?.phase === 'processing' ? `Checked ${searchProgress.processed} of ${searchProgress.total} releases. Results and ranking are provisional until processing finishes.` : 'Waiting for search providers. Closing this window cancels further processing.'}</p>
+          </div> : null
+        }
+
+        {
+          !isFetching && error ?
+            <div className={styles.blankpad}>
+              {error.responseJSON?.message || translate('UnableToLoadInteractiveSearch')}
+            </div> :
+            null
+        }
+
+        {
+          !isFetching && !error && isPopulated && !totalReleasesCount ?
+            <Alert kind={kinds.INFO}>
+              {translate('NoResultsFound')}
+            </Alert> :
+            null
+        }
+
+        {
+          !!totalReleasesCount && isPopulated && !items.length ?
+            <Alert kind={kinds.WARNING}>
+              {translate('AllResultsAreHiddenByTheAppliedFilter')}
+            </Alert> :
+            null
+        }
+
+        {
+          isPopulated && !!items.length ?
+            <Table
+              columns={columns}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSortPress={onSortPress}
+            >
+              <TableBody>
+                {
+                  pageItems.map((item) => {
+                    return (
+                      <InteractiveSearchRow
+                        key={`${item.indexerId}-${item.guid}`}
+                        {...item}
+                        searchPayload={searchPayload}
+                        longDateFormat={longDateFormat}
+                        timeFormat={timeFormat}
+                        onGrabPress={onGrabPress}
+                      />
+                    );
+                  })
+                }
+              </TableBody>
+            </Table> :
+            null
+        }
+
+        {items.length > 0 ? <div className={styles.filteredMessage}>
+          <button disabled={page <= 1} onClick={() => this.setState({ page: page - 1 })}>Previous</button>{' '}
+          <span>Page {page} of {pageCount} · {items.length} results in this view</span>{' '}
+          <button disabled={page >= pageCount} onClick={() => this.setState({ page: page + 1 })}>Next</button>
+        </div> : null}
+
+        {
+          totalReleasesCount !== items.length && !!items.length ?
+            <div className={styles.filteredMessage}>
+              {translate('SomeResultsAreHiddenByTheAppliedFilter')}
+            </div> :
+            null
+        }
       </div>
-
-      {
-        isFetching ? <LoadingIndicator /> : null
-      }
-
-      {
-        !isFetching && error ?
-          <div className={styles.blankpad}>
-            {translate('UnableToLoadInteractiveSearch')}
-          </div> :
-          null
-      }
-
-      {
-        !isFetching && isPopulated && !totalReleasesCount ?
-          <Alert kind={kinds.INFO}>
-            {translate('NoResultsFound')}
-          </Alert> :
-          null
-      }
-
-      {
-        !!totalReleasesCount && isPopulated && !items.length ?
-          <Alert kind={kinds.WARNING}>
-            {translate('AllResultsAreHiddenByTheAppliedFilter')}
-          </Alert> :
-          null
-      }
-
-      {
-        isPopulated && !!items.length ?
-          <Table
-            columns={columns}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSortPress={onSortPress}
-          >
-            <TableBody>
-              {
-                items.map((item) => {
-                  return (
-                    <InteractiveSearchRow
-                      key={`${item.indexerId}-${item.guid}`}
-                      {...item}
-                      searchPayload={searchPayload}
-                      longDateFormat={longDateFormat}
-                      timeFormat={timeFormat}
-                      onGrabPress={onGrabPress}
-                    />
-                  );
-                })
-              }
-            </TableBody>
-          </Table> :
-          null
-      }
-
-      {
-        totalReleasesCount !== items.length && !!items.length ?
-          <div className={styles.filteredMessage}>
-            {translate('SomeResultsAreHiddenByTheAppliedFilter')}
-          </div> :
-          null
-      }
-    </div>
-  );
+    );
+  }
 }
 
 InteractiveSearch.propTypes = {
   searchPayload: PropTypes.object.isRequired,
+  searchProgress: PropTypes.object,
   isFetching: PropTypes.bool.isRequired,
   isPopulated: PropTypes.bool.isRequired,
   error: PropTypes.object,

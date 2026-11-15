@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using FluentValidation;
 using Lidarr.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
 using NzbDrone.Common.Cache;
@@ -136,6 +139,82 @@ namespace Lidarr.Api.V1.Indexers
             }
 
             return Ok(release);
+        }
+
+        [HttpGet("stream")]
+        public async Task StreamReleases(int? albumId, int? artistId)
+        {
+            if (albumId.HasValue == artistId.HasValue || albumId <= 0 || artistId <= 0)
+            {
+                Response.StatusCode = 400;
+                return;
+            }
+
+            var cancellationToken = HttpContext.RequestAborted;
+            Response.ContentType = "application/x-ndjson";
+            Response.Headers["Cache-Control"] = "no-store";
+            Response.Headers["X-Accel-Buffering"] = "no";
+            var options = NzbDrone.Common.Serializer.STJson.GetSerializerSettings();
+            options.WriteIndented = false;
+            var winners = new Dictionary<string, DownloadDecision>();
+            var weights = new Dictionary<string, int>();
+            async Task Send(object message)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await Response.WriteAsync(JsonSerializer.Serialize(message, options) + "\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+            }
+
+            async Task Progress(int processed, int total, List<DownloadDecision> batch)
+            {
+                var changes = new List<ReleaseResource>();
+                foreach (var decision in batch)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var key = decision.RemoteAlbum.Release.Guid == null ? "null:" : "guid:" + decision.RemoteAlbum.Release.Guid;
+                    if (winners.TryGetValue(key, out var previous))
+                    {
+                        var comparison = decision.Rejections.Count().CompareTo(previous.Rejections.Count());
+                        if (comparison > 0 || (comparison == 0 && decision.RemoteAlbum.Release.IndexerPriority >= previous.RemoteAlbum.Release.IndexerPriority))
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        weights[key] = weights.Count;
+                    }
+
+                    winners[key] = decision;
+                    changes.Add(MapDecision(decision, weights[key]));
+                }
+
+                await Send(new { type = "batch", processed, total, records = changes });
+            }
+
+            try
+            {
+                await Send(new { type = "searching" });
+                var decisions = albumId.HasValue ?
+                    await _releaseSearchService.AlbumSearchProgressive(albumId.Value, cancellationToken, Progress) :
+                    await _releaseSearchService.ArtistSearchProgressive(artistId.Value, cancellationToken, Progress);
+                cancellationToken.ThrowIfCancellationRequested();
+                var prioritized = _prioritizeDownloadDecision.PrioritizeDecisions(decisions);
+                cancellationToken.ThrowIfCancellationRequested();
+                await Send(new { type = "complete", records = MapDecisions(prioritized) });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Closing the interactive window cancels evaluation, not previously queued downloads.
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Progressive release search failed");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await Send(new { type = "error", message = "Search did not finish. Partial results are incomplete. Check the logs or start a new search." });
+                }
+            }
         }
 
         [HttpGet]

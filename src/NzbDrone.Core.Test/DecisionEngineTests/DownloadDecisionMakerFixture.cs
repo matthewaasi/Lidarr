@@ -66,6 +66,9 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             Mocker.GetMock<IParsingService>()
                   .Setup(c => c.Map(It.IsAny<ParsedAlbumInfo>(), It.IsAny<SearchCriteriaBase>()))
                   .Returns(_remoteAlbum);
+
+            // AutoMoq may initialize the platform logger after the base logging setup.
+            InitLogging();
         }
 
         private void GivenSpecifications(params Mock<IDecisionEngineSpecification>[] mocks)

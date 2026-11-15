@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
@@ -18,6 +21,7 @@ namespace NzbDrone.Core.DecisionEngine
     {
         List<DownloadDecision> GetRssDecision(List<ReleaseInfo> reports, bool pushedRelease = false);
         List<DownloadDecision> GetSearchDecision(List<ReleaseInfo> reports, SearchCriteriaBase searchCriteriaBase);
+        Task<List<DownloadDecision>> GetSearchDecisionProgressive(List<ReleaseInfo> reports, SearchCriteriaBase criteria, CancellationToken cancellationToken, Func<int, List<DownloadDecision>, Task> progress);
     }
 
     public class DownloadDecisionMaker : IMakeDownloadDecision
@@ -51,7 +55,31 @@ namespace NzbDrone.Core.DecisionEngine
             return GetAlbumDecisions(reports, false, searchCriteriaBase).ToList();
         }
 
-        private IEnumerable<DownloadDecision> GetAlbumDecisions(List<ReleaseInfo> reports, bool pushedRelease = false, SearchCriteriaBase searchCriteria = null)
+        public async Task<List<DownloadDecision>> GetSearchDecisionProgressive(List<ReleaseInfo> reports, SearchCriteriaBase criteria, CancellationToken cancellationToken, Func<int, List<DownloadDecision>, Task> progress)
+        {
+            var decisions = new List<DownloadDecision>();
+            var batch = new List<DownloadDecision>();
+            var processed = 0;
+            var timer = Stopwatch.StartNew();
+            foreach (var decision in GetAlbumDecisions(reports, false, criteria, cancellationToken, count => processed = count))
+            {
+                decisions.Add(decision);
+                batch.Add(decision);
+                if (batch.Count >= 100 || timer.ElapsedMilliseconds >= 250)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await progress(processed, batch);
+                    batch = new List<DownloadDecision>();
+                    timer.Restart();
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await progress(processed, batch);
+            return decisions;
+        }
+
+        private IEnumerable<DownloadDecision> GetAlbumDecisions(List<ReleaseInfo> reports, bool pushedRelease = false, SearchCriteriaBase searchCriteria = null, CancellationToken cancellationToken = default, Action<int> processed = null)
         {
             if (reports.Any())
             {
@@ -66,6 +94,7 @@ namespace NzbDrone.Core.DecisionEngine
 
             foreach (var report in reports)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 DownloadDecision decision = null;
                 _logger.ProgressTrace("Processing release {0}/{1}", reportNumber, reports.Count);
                 _logger.Debug("Processing release '{0}' from '{1}'", report.Title, report.Indexer);
@@ -157,6 +186,10 @@ namespace NzbDrone.Core.DecisionEngine
                         }
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception e)
                 {
                     _logger.Error(e, "Couldn't process release.");
@@ -165,6 +198,8 @@ namespace NzbDrone.Core.DecisionEngine
                     decision = new DownloadDecision(remoteAlbum, new Rejection("Unexpected error processing release"));
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
+                processed?.Invoke(reportNumber);
                 reportNumber++;
 
                 if (decision != null)

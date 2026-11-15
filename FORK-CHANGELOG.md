@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.2.1.5196-ai.14 — Progressive interactive search and cancellation
+
+- Display fully checked release batches with progress and provisional ranking while interactive evaluation continues.
+- Preserve matching rules, GUID deduplication and final ranking; no result caps or relaxed thresholds.
+- Paginate review in groups of 100 while retaining access to all results.
+- Cancel further server evaluation when the results window closes; in-flight provider calls may finish and queued downloads continue.
+- Handle truncated/error streams explicitly and ignore late responses after cancellation.
+- Preserve the original release API and automatic-search behavior.
+- See [release notes](docs/releases/ai.14.md) for installation, verification and provider/proxy limitations.
+
 ## 3.2.1.5196-ai.13 — Audit deletion and file previews
 
 - Delete individual, selected or all audit findings; deleting all findings never removes the library or music files.

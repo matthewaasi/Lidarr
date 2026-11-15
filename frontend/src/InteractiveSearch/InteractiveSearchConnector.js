@@ -12,9 +12,11 @@ function createMapStateToProps(appState, { type }) {
     (state) => state.releases.items.length,
     createClientSideCollectionSelector('releases', `releases.${type}`),
     createUISettingsSelector(),
-    (totalReleasesCount, releases, uiSettings) => {
+    (state) => state.releases.searchProgress,
+    (totalReleasesCount, releases, uiSettings, searchProgress) => {
       return {
         totalReleasesCount,
+        searchProgress,
         longDateFormat: uiSettings.longDateFormat,
         timeFormat: uiSettings.timeFormat,
         ...releases

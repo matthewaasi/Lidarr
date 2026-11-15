@@ -1,9 +1,11 @@
 import { createAction } from 'redux-actions';
+import { batchActions } from 'redux-batched-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, filterTypes, sortDirections } from 'Helpers/Props';
+import { set, update } from 'Store/Actions/baseActions';
 import { createThunk, handleThunks } from 'Store/thunks';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
+import createProgressiveReleaseSearch from 'Utilities/createProgressiveReleaseSearch';
 import translate from 'Utilities/String/translate';
-import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
 import createSetClientSideCollectionFilterReducer from './Creators/Reducers/createSetClientSideCollectionFilterReducer';
 import createSetClientSideCollectionSortReducer from './Creators/Reducers/createSetClientSideCollectionSortReducer';
@@ -22,6 +24,7 @@ let abortCurrentRequest = null;
 
 export const defaultState = {
   isFetching: false,
+  searchProgress: null,
   isPopulated: false,
   error: null,
   items: [],
@@ -250,25 +253,34 @@ export const setAlbumReleasesFilter = createAction(SET_ALBUM_RELEASES_FILTER);
 export const setArtistReleasesFilter = createAction(SET_ARTIST_RELEASES_FILTER);
 
 //
-// Helpers
-
-const fetchReleasesHelper = createFetchHandler(section, '/release');
-
-//
 // Action Handlers
 
 export const actionHandlers = handleThunks({
 
   [FETCH_RELEASES]: function(getState, payload, dispatch) {
-    const abortRequest = fetchReleasesHelper(getState, payload, dispatch);
-
-    abortCurrentRequest = abortRequest;
+    if (abortCurrentRequest) {
+      abortCurrentRequest();
+    }
+    dispatch(batchActions([update({ section, data: [] }), set({ section, isFetching: true, isPopulated: false, error: null, searchProgress: { phase: 'searching' } })]));
+    abortCurrentRequest = createProgressiveReleaseSearch(payload, (result) => {
+      const previous = new Map(getState().releases.items.map((item) => [`${item.indexerId}-${item.guid}`, item]));
+      const items = result.items.map((item) => {
+        const existing = previous.get(`${item.indexerId}-${item.guid}`);
+        return existing ? { ...item, isGrabbing: existing.isGrabbing, isGrabbed: existing.isGrabbed, grabError: existing.grabError } : item;
+      });
+      dispatch(batchActions([
+        update({ section, data: items }),
+        set({ section, isFetching: result.phase !== 'complete', isPopulated: true, error: null, searchProgress: { phase: result.phase, processed: result.processed, total: result.total } })
+      ]));
+    }, (error) => dispatch(set({ section, isFetching: false, error, searchProgress: { phase: 'failed' } })));
   },
 
   [CANCEL_FETCH_RELEASES]: function(getState, payload, dispatch) {
     if (abortCurrentRequest) {
-      abortCurrentRequest = abortCurrentRequest();
+      abortCurrentRequest();
+      abortCurrentRequest = null;
     }
+    dispatch(set({ section, isFetching: false, searchProgress: null }));
   },
 
   [GRAB_RELEASE]: function(getState, payload, dispatch) {
