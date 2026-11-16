@@ -46,3 +46,14 @@ The preview warns when every remaining audited copy in a duplicate group would b
 File removal follows Lidarr's recycle-bin settings and removes selected file records. Artist and album entries remain; monitoring is unchanged, so missing tracks can be downloaded again. On a partial failure, the batch stops and findings are retained. Some selected files may already be deleted; refresh and rescan before retrying.
 
 API: `DELETE /api/v1/libraryaudit/{id}`, `DELETE /api/v1/libraryaudit/bulk` (JSON ID array), and `DELETE /api/v1/libraryaudit/all` remove findings only. `POST /api/v1/libraryaudit/deletefiles/preview` accepts `{ "findings": [{ "id": 1, "evidenceKey": "..." }], "fileIds": [123] }`. The final `POST /api/v1/libraryaudit/deletefiles` additionally requires the returned `previewKey` and, when every copy is selected, `confirmAllCopies: true`.
+
+
+## Live progress in ai.16
+
+The Audit page displays a native progress bar with the current phase, stage number, completed/total counts and percentage. Inspection counts files attempted, including inspection errors; duplicate checking counts candidate files hashed or checked. Counts update in memory for each file, with log messages throttled to avoid one extra message per file. Fingerprint lookups and duplicate-group verification are named in the current activity.
+
+Percentages apply to the current phase, not elapsed time or a weighted estimate of the whole scan. They can reset when the phase changes. Loading and final saving are indeterminate because their total work is not known in advance. The page marks the audit completed only after the command completes; cancelled or failed scans retain their last phase progress and are labelled stopped.
+
+Progress is supplied in `command.body.progress` through the existing command API. The page polls every two seconds, reconnects to a running scan after reopening, and retries failed progress requests while labelling the displayed values as last received. A new scan clears previous progress. Closing the page does not cancel the server scan. Progress is transient and cannot be retrofitted to a scan running on an older version; upgrading requires a restart and progress is available for new scans afterwards.
+
+This feature does not alter findings, matching thresholds, cancellation safety or scan eligibility. Runtime progress is excluded from command equality, so updating a counter does not break duplicate-command detection.

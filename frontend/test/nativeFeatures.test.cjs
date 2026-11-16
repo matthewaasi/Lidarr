@@ -349,3 +349,95 @@ test('ordinary file deletion reviews preview first and resets it after server re
   assert.equal(instance.state.confirmAllCopies, false);
   assert.equal(instance.deleteButtonLabel(), 'Preview file deletion');
 });
+
+
+test('audit phase percentage and completed file counts are visible and accessible', () => {
+  const { instance } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ scanning: true, scanStatus: 'started', scanProgress: { phase: 'inspection', processed: 74366, total: 228816, percentage: 32.5, stage: 1, stages: 3, activity: 'Fingerprint lookup', updated: '2026-11-15T12:00:00Z' } });
+  const output = text(instance.renderProgress());
+  assert.match(output, /Inspecting files.*32.5%/);
+  assert.match(output, /74,366 \/ 228,816 files inspected/);
+  assert.match(output, /Stage 1 of 3/);
+  assert.match(output, /Fingerprint lookup/);
+  assert.equal(nodes(instance.renderProgress(), (node) => node.type === 'progress')[0].props.value, 32.5);
+});
+
+test('audit reopening attaches to a started scan ahead of queued scans', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.componentDidMount();
+  calls[1].resolve([{ id: 8, name: 'ScanLibraryAudit', status: 'queued' }, { id: 9, name: 'ScanLibraryAudit', status: 'started', body: { progress: { phase: 'inspection', processed: 1, total: 2, percentage: 50, stage: 1, stages: 3 } } }]);
+  await settle();
+  assert.equal(calls[2].options.url, '/command/9');
+  assert.equal(instance.state.scanProgress.percentage, 50);
+  instance.componentWillUnmount();
+});
+
+test('audit saving is indeterminate and completion requires the command to finish', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ scanning: true, scanStatus: 'started', scanProgress: { phase: 'saving', processed: 0, total: null, percentage: null, stage: 3, stages: 3 } });
+  assert.equal(nodes(instance.renderProgress(), (node) => node.type === 'progress')[0].props.value, undefined);
+  instance.setState({ scanProgress: { phase: 'completed', percentage: 100, stage: 3, stages: 3 } });
+  assert.doesNotMatch(text(instance.renderProgress()), /Audit completed/);
+  instance.poll(9);
+  calls[0].resolve({ status: 'completed', body: { progress: { phase: 'completed', percentage: 100, stage: 3, stages: 3 } } });
+  await settle();
+  assert.equal(instance.state.scanning, false);
+  assert.match(text(instance.renderProgress()), /Audit completed.*100.0%/);
+  instance.componentWillUnmount();
+});
+
+test('cancelled audit retains phase progress without claiming completion', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ scanning: true });
+  instance.poll(9);
+  calls[0].resolve({ status: 'cancelled', body: { progress: { phase: 'inspection', processed: 1, total: 2, percentage: 50, stage: 1, stages: 3 } } });
+  await settle();
+  assert.equal(instance.state.scanning, false);
+  assert.match(text(instance.renderProgress()), /Cancelled/);
+  assert.match(text(instance.renderProgress()), /50.0%/);
+  assert.doesNotMatch(text(instance.renderProgress()), /Audit completed/);
+  instance.componentWillUnmount();
+});
+
+test('failed progress polling keeps the running scan and labels the last received progress', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.setState({ scanning: true, scanStatus: 'started', scanProgress: { phase: 'inspection', percentage: 50, processed: 1, total: 2 } });
+  instance.poll(9);
+  calls[0].reject({ status: 503 });
+  await settle();
+  assert.equal(instance.state.scanning, true);
+  assert.match(text(instance.renderProgress()), /Last received progress/);
+  assert.match(instance.state.progressError, /Retrying/);
+  instance.poll(9);
+  calls[1].resolve({ status: 'started', body: { progress: { phase: 'inspection', percentage: 75, processed: 3, total: 4 } } });
+  await settle();
+  assert.equal(instance.state.progressError, '');
+  assert.equal(instance.state.scanProgress.percentage, 75);
+  instance.componentWillUnmount();
+});
+
+test('new audit resets old progress and missing server counters stay indeterminate', () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.setState({ scanStatus: 'completed', scanProgress: { phase: 'completed', percentage: 100 } });
+  instance.onScan();
+  assert.equal(instance.state.scanProgress, null);
+  assert.equal(instance.state.scanStatus, 'queued');
+  assert.equal(nodes(instance.renderProgress(), (node) => node.type === 'progress')[0].props.value, undefined);
+  assert.equal(calls[0].options.url, '/command');
+});
+
+
+test('failed audit submission does not leave a phantom queued progress indicator', async () => {
+  const { instance, calls } = harness('Library/Audit/LibraryAudit.js');
+  instance.mounted = true;
+  instance.onScan();
+  calls[0].reject({ responseJSON: { message: 'Cannot start scan' } });
+  await settle();
+  assert.equal(instance.state.scanning, false);
+  assert.equal(instance.renderProgress(), null);
+  assert.equal(instance.state.error, 'Cannot start scan');
+  instance.componentWillUnmount();
+});

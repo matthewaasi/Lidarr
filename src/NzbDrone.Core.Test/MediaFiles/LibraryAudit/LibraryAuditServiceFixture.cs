@@ -389,6 +389,91 @@ namespace NzbDrone.Core.Test.MediaFilesTests.LibraryAudit
             _repository.Verify(x => x.Insert(It.IsAny<LibraryAuditFinding>()), Times.Never);
         }
 
+        [Test]
+        public void inspection_progress_counts_completed_files_including_read_errors()
+        {
+            var first = Add();
+            var second = Add();
+            var command = new ScanLibraryAuditCommand { Duplicates = false };
+            var samples = new List<AuditScanProgress>();
+            _tags.Setup(x => x.ReadTags(It.IsAny<string>())).Returns((string path) =>
+            {
+                samples.Add(command.GetProgressSnapshot());
+                if (path == first.Path)
+                {
+                    throw new IOException("Unreadable tags");
+                }
+
+                return new ParsedTrackInfo { Title = "Song", Duration = TimeSpan.FromSeconds(100) };
+            });
+            _service.Execute(command);
+            Assert.That(samples.Select(x => x.Processed), Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(samples.Select(x => x.Total), Is.EqualTo(new int?[] { 2, 2 }));
+            Assert.That(samples.Select(x => x.Percentage), Is.EqualTo(new double?[] { 0, 50 }));
+            Assert.That(samples.All(x => x.Phase == "inspection" && x.Stage == 1 && x.Stages == 2), Is.True);
+            Assert.That(command.GetProgressSnapshot().Phase, Is.EqualTo("completed"));
+            Assert.That(command.GetProgressSnapshot().Percentage, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void duplicates_and_saving_have_distinct_progress_phases()
+        {
+            Add();
+            Add();
+            var command = new ScanLibraryAuditCommand { Versions = false };
+            var hashes = new List<AuditScanProgress>();
+            var saving = new List<AuditScanProgress>();
+            _disk.Setup(x => x.OpenReadStream(It.IsAny<string>())).Returns((string path) =>
+            {
+                hashes.Add(command.GetProgressSnapshot());
+                return File.OpenRead(path);
+            });
+            _repository.Setup(x => x.All()).Returns(() =>
+            {
+                saving.Add(command.GetProgressSnapshot());
+                return _rows.ToList();
+            });
+            _service.Execute(command);
+            Assert.That(hashes.Select(x => x.Processed), Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(hashes.All(x => x.Phase == "duplicates" && x.Stage == 2 && x.Total == 2), Is.True);
+            Assert.That(saving.Single().Phase, Is.EqualTo("saving"));
+            Assert.That(saving.Single().Stage, Is.EqualTo(3));
+            Assert.That(saving.Single().Percentage, Is.Null);
+            Assert.That(command.GetProgressSnapshot().Phase, Is.EqualTo("completed"));
+        }
+
+        [Test]
+        public void cancelled_scan_does_not_report_completion()
+        {
+            Add();
+            var command = new ScanLibraryAuditCommand { Duplicates = false };
+            _tags.Setup(x => x.ReadTags(It.IsAny<string>())).Callback(() => command.RequestCancellation()).Returns(new ParsedTrackInfo { Title = "Song", Duration = TimeSpan.FromSeconds(100) });
+            Assert.Throws<OperationCanceledException>(() => _service.Execute(command));
+            Assert.That(command.GetProgressSnapshot().Phase, Is.EqualTo("inspection"));
+            Assert.That(command.GetProgressSnapshot().Processed, Is.Zero);
+            Assert.That(command.GetProgressSnapshot().Percentage, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void failed_save_does_not_report_completed_progress()
+        {
+            Add();
+            var command = new ScanLibraryAuditCommand { Duplicates = false };
+            _repository.Setup(x => x.Insert(It.IsAny<LibraryAuditFinding>())).Throws(new IOException("Database failure"));
+            Assert.Throws<IOException>(() => _service.Execute(command));
+            Assert.That(command.GetProgressSnapshot().Phase, Is.EqualTo("saving"));
+            Assert.That(command.GetProgressSnapshot().Percentage, Is.Null);
+        }
+
+        [Test]
+        public void empty_library_completes_without_division_by_zero()
+        {
+            var command = new ScanLibraryAuditCommand();
+            _service.Execute(command);
+            Assert.That(command.GetProgressSnapshot().Phase, Is.EqualTo("completed"));
+            Assert.That(command.GetProgressSnapshot().Percentage, Is.EqualTo(100));
+        }
+
         private TrackFile Add(string content = "same bytes")
         {
             var path = Path.Combine(Path.GetTempPath(), $"lidarr-audit-{Guid.NewGuid():N}.flac");

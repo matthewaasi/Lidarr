@@ -15,15 +15,16 @@ const fileSize = (bytes) => `${bytes.toLocaleString()} bytes (${(bytes / 1024 / 
 const duration = (seconds) => (seconds > 0 ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}` : 'Unknown');
 
 class LibraryAudit extends Component {
-  state = { records: [], total: 0, page: 1, status: 'pending', kind: 'all', versions: true, duplicates: true, fingerprints: false, loading: true, busy: false, scanning: false, error: '', confirmId: null, selectedIds: [], deleteTarget: null, deleteFileIds: [], deletionPreview: null, confirmAllCopies: false };
+  state = { records: [], total: 0, page: 1, status: 'pending', kind: 'all', versions: true, duplicates: true, fingerprints: false, loading: true, busy: false, scanning: false, scanProgress: null, scanStatus: null, progressError: '', error: '', confirmId: null, selectedIds: [], deleteTarget: null, deleteFileIds: [], deletionPreview: null, confirmAllCopies: false };
 
   componentDidMount() {
     this.mounted = true;
     this.onLoad();
     this.request({ url: '/command', dataType: 'json' }, (commands) => {
-      const active = commands.find((command) => command.name === 'ScanLibraryAudit' && ['queued', 'started'].includes(command.status));
+      const audits = commands.filter((command) => command.name === 'ScanLibraryAudit');
+      const active = audits.find((command) => command.status === 'started') || audits.find((command) => command.status === 'queued');
       if (active && !this.state.scanning) {
-        this.setState({ scanning: true });
+        this.setState({ scanning: true, scanStatus: active.status, scanProgress: active.body?.progress || null, progressError: '' });
         this.poll(active.id);
       }
     }, (xhr) => this.setState({ error: featureError(xhr) }));
@@ -137,13 +138,57 @@ class LibraryAudit extends Component {
   };
 
   poll = (id) => {
+    clearTimeout(this.timer);
     this.request({ url: `/command/${id}`, dataType: 'json' }, (command) => {
+      const scanState = { scanStatus: command.status, scanProgress: command.body?.progress || null, progressError: '' };
       if (['completed', 'failed', 'cancelled', 'aborted', 'orphaned'].includes(command.status)) {
-        this.setState({ scanning: false, error: command.status === 'completed' ? '' : 'Audit did not finish. Check System → Tasks and the logs.' }, this.onLoad);
+        this.setState({ ...scanState, scanning: false, error: ['completed', 'cancelled'].includes(command.status) ? '' : 'Audit did not finish. Check System → Tasks and the logs.' }, this.onLoad);
       } else {
+        this.setState(scanState);
         this.timer = setTimeout(() => this.poll(id), 2000);
       }
-    }, (xhr) => this.setState({ scanning: false, error: featureError(xhr) }));
+    }, () => {
+      this.setState({ progressError: 'Unable to refresh progress. The scan may still be running. Retrying…' });
+      this.timer = setTimeout(() => this.poll(id), 5000);
+    });
+  };
+
+  renderProgress = () => {
+    const { scanning, scanStatus, scanProgress, progressError } = this.state;
+    if (!scanning && !scanStatus) {
+      return null;
+    }
+    const phaseLabels = { queued: 'Waiting to start', loading: 'Loading library files', inspection: 'Inspecting files', duplicates: 'Checking duplicates', saving: 'Saving findings', completed: 'Audit completed' };
+    const stopped = ['cancelled', 'failed', 'aborted', 'orphaned'].includes(scanStatus);
+    let phase = scanProgress?.phase || (scanStatus === 'queued' ? 'queued' : 'loading');
+    let percentage = scanProgress?.percentage ?? null;
+    if (scanStatus === 'completed') {
+      phase = 'completed';
+      percentage = 100;
+    } else if (phase === 'completed') {
+      phase = 'saving';
+      percentage = null;
+    }
+    const label = phaseLabels[phase] || 'Audit progress';
+    return (
+      <section className={styles.confirm} aria-label="Audit progress">
+        <p role="status" aria-live="polite">
+          {stopped ? `${scanStatus === 'cancelled' ? 'Cancelled' : 'Stopped'} · ` : ''}
+          {scanProgress?.stage > 0 ? `Stage ${scanProgress.stage} of ${scanProgress.stages} · ` : ''}
+          <strong>{label}{percentage == null ? '' : ` — ${percentage.toFixed(1)}%`}</strong>
+          {progressError ? ' · Last received progress' : ''}
+        </p>
+        <progress aria-label={`${label} progress`} max={100}
+          value={percentage == null ? undefined : percentage} style={{ width: '100%' }}
+        />
+        {['inspection', 'duplicates'].includes(phase) && scanProgress?.total != null ? <p>{scanProgress.processed.toLocaleString()} / {scanProgress.total.toLocaleString()} {phase === 'inspection' ? 'files inspected' : 'duplicate candidate files hashed or checked'}</p> : null}
+        {scanProgress?.activity && !stopped ? <p>{scanProgress.activity}</p> : null}
+        {scanProgress?.updated && phase !== 'queued' ? <small>Last progress update: {new Date(scanProgress.updated).toLocaleTimeString()}</small> : null}
+        <p>Percentage applies to the current phase, not time remaining. Inspection and duplicate checks can take different amounts of time.</p>
+        {scanStatus === 'cancelled' ? <Alert>Audit cancelled. Findings from the unfinished scan were not saved.</Alert> : null}
+        {progressError ? <Alert kind={kinds.WARNING}>{progressError}</Alert> : null}
+      </section>
+    );
   };
 
   onScan = () => {
@@ -151,9 +196,9 @@ class LibraryAudit extends Component {
     if (scanning || (!versions && !duplicates)) {
       return;
     }
-    this.setState({ scanning: true, error: '', confirmId: null });
+    this.setState({ scanning: true, scanProgress: null, scanStatus: 'queued', progressError: '', error: '', confirmId: null });
     this.request({ url: '/command', method: 'POST', dataType: 'json', data: JSON.stringify({ name: 'ScanLibraryAudit', versions, duplicates, fingerprints: versions && fingerprints }) },
-      (command) => this.poll(command.id), (xhr) => this.setState({ scanning: false, error: featureError(xhr) }));
+      (command) => this.setState({ scanStatus: command.status || 'queued', scanProgress: command.body?.progress || null }, () => this.poll(command.id)), (xhr) => this.setState({ scanning: false, scanStatus: null, scanProgress: null, error: featureError(xhr) }));
   };
 
   render() {
@@ -192,7 +237,8 @@ class LibraryAudit extends Component {
           </div>
           <p>Version checks compare filename, embedded title and assigned catalog duration. Suggested versions come from the same artist’s local catalog. These are clues, not proof of the audio version. Duplicate checks read complete files of equal size and require identical SHA-256 hashes; differently tagged or encoded copies will not match. Large scans can take time.</p>
           <p>Optional deep checks require fpcalc and send audio fingerprints and durations to AcoustID using Lidarr’s existing lookup. This checks every assigned single-track file and can be slow. Fingerprint associations support review; they do not prove a mix label.</p>
-          {scanning ? <Alert>Audit is running. Progress is available under System → Tasks. Results appear when the scan finishes.</Alert> : null}
+          {this.renderProgress()}
+          {scanning ? <Alert>The scan continues if you leave this page. Cancel a running audit under System → Tasks. Findings appear when the scan finishes.</Alert> : null}
           {error ? <Alert kind={kinds.DANGER}>{error}</Alert> : null}
           <div className={styles.toolbar}>
             <label>Status

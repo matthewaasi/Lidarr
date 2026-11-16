@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.1.5196-ai.16 — Live Audit-page progress
+
+- Show phase percentages, completed/total file counts, stage numbers, activity and last update time on Library → Audit.
+- Reconnect to active scans after reopening the page; retain last received progress and retry on polling errors.
+- Keep loading/saving indeterminate and distinguish stopped scans from successful completion.
+- Preserve scan behavior and cancellation safety; exclude runtime progress from duplicate-command detection.
+- Throttle progress logs while updating in-memory file counts on every completed attempt.
+- See [release notes](docs/releases/ai.16.md) for installation and the limitation that older running scans cannot gain counters retroactively.
+
 ## 3.2.1.5196-ai.15 — Running task cancellation and named search progress
 
 - List outstanding indexers in interactive search, followed by Processing release X/Y and final ranking.

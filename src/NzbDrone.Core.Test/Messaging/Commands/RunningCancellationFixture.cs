@@ -70,6 +70,16 @@ namespace NzbDrone.Core.Test.Messaging.Commands
         }
 
         [Test]
+        public void progress_updates_do_not_break_duplicate_command_detection()
+        {
+            var body = new NzbDrone.Core.MediaFiles.LibraryAudit.ScanLibraryAuditCommand();
+            var first = _manager.Push(body);
+            body.ReportProgress("inspection", 75, 100);
+            var repeated = _manager.Push(new NzbDrone.Core.MediaFiles.LibraryAudit.ScanLibraryAuditCommand());
+            Assert.That(repeated, Is.SameAs(first));
+        }
+
+        [Test]
         public void queued_cancellation_is_persisted_without_a_start_time()
         {
             var model = _manager.Push(new CommandA());

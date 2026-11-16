@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -228,6 +229,21 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                 throw new BadRequestException("Fingerprint checks require Version audit and a working fpcalc installation.");
             }
 
+            var progressClock = Stopwatch.StartNew();
+            string lastPhase = null;
+            void Report(string phase, int processed, int? total, string activity = null)
+            {
+                message.ReportProgress(phase, processed, total, activity);
+                if (phase != lastPhase || progressClock.ElapsedMilliseconds >= 2000 || (total.HasValue && processed == total && activity == null))
+                {
+                    var progress = message.GetProgressSnapshot();
+                    _logger.ProgressInfo("Library audit: {0} {1}/{2} {3}", phase, processed, total?.ToString() ?? "unknown", activity ?? (progress.Percentage.HasValue ? progress.Percentage.Value + "%" : string.Empty));
+                    lastPhase = phase;
+                    progressClock.Restart();
+                }
+            }
+
+            Report("loading", 0, null, "Loading library files");
             var findings = new List<LibraryAuditFinding>();
             var files = _files.All().OrderBy(x => x.Id).ToList();
             var snapshots = new Dictionary<int, AuditFile>();
@@ -235,10 +251,13 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
             var versionFailures = new HashSet<int>();
             var duplicateFailures = new HashSet<int>();
             _logger.ProgressInfo("Library audit: inspecting {0} files", files.Count);
+            var inspected = 0;
+            Report("inspection", 0, files.Count);
 
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                Report("inspection", inspected, files.Count, $"Inspecting file {inspected + 1} of {files.Count}");
                 var snapshot = Describe(file);
                 try
                 {
@@ -273,6 +292,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                     {
                         if (message.Fingerprints)
                         {
+                            Report("inspection", inspected, files.Count, $"Fingerprint lookup for file {inspected + 1} of {files.Count}");
                             _logger.ProgressInfo("Library audit: fingerprinting file {0} of {1}", snapshots.Count, files.Count);
                             var local = new LocalTrack { Path = file.Path, ExistingFile = true };
                             try
@@ -330,6 +350,13 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                     findings.Add(Error(message.Versions ? "versionError" : "duplicateError", snapshot, ex));
                     _logger.Debug(ex, "Library audit could not inspect {0}", file.Path);
                 }
+                finally
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        Report("inspection", ++inspected, files.Count);
+                    }
+                }
             }
 
             if (message.Duplicates)
@@ -337,6 +364,9 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                 // Equal length is required for byte-identical files. Avoid reading unique sizes.
                 var groups = snapshots.Values.Where(x => x.Size > 0).GroupBy(x => x.Size).Where(x => x.Count() > 1).ToList();
                 var processed = 0;
+                var duplicateFiles = groups.Sum(group => group.Count());
+                var hashed = 0;
+                Report("duplicates", 0, duplicateFiles);
                 foreach (var group in groups)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -344,6 +374,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                     foreach (var file in group)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        Report("duplicates", hashed, duplicateFiles, $"Hashing file {hashed + 1} of {duplicateFiles}; group {processed + 1} of {groups.Count}");
                         try
                         {
                             EnsureUnchanged(file);
@@ -368,8 +399,16 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                             findings.Add(Error("duplicateError", file, ex));
                             _logger.Debug(ex, "Library audit could not hash {0}", file.Path);
                         }
+                        finally
+                        {
+                            if (!cancellationToken.IsCancellationRequested)
+                            {
+                                Report("duplicates", ++hashed, duplicateFiles);
+                            }
+                        }
                     }
 
+                    Report("duplicates", hashed, duplicateFiles, $"Verifying duplicate group {processed + 1} of {groups.Count}");
                     foreach (var match in hashes.Where(x => x.Value.Count > 1))
                     {
                         var verified = new List<AuditFile>();
@@ -416,6 +455,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
             lock (_gate)
             {
                 message.BeginFinalization();
+                Report("saving", 0, null, "Saving findings; cancellation is unavailable during this phase");
                 _logger.ProgressInfo("Saving completed library audit findings");
                 var existing = _repository.All().ToDictionary(x => x.EvidenceKey);
                 var seen = new HashSet<string>();
@@ -460,6 +500,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
             }
 
             _logger.ProgressInfo("Library audit finished: {0} findings. Review them under Library → Audit.", findings.Count);
+            Report("completed", 1, 1, $"Audit finished: {findings.Count} findings");
         }
 
         private static string HashFile(Stream stream, CancellationToken cancellationToken)

@@ -14,6 +14,9 @@ namespace NzbDrone.Core.Messaging.Commands
         private bool _finalizing;
 
         public virtual bool SupportsCancellation => false;
+        public object Progress => GetProgress();
+
+        protected virtual object GetProgress() => null;
 
         [JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
