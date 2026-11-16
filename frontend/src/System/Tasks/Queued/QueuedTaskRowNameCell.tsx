@@ -25,6 +25,7 @@ function formatTitles(titles: string[]) {
 
 export interface QueuedTaskRowNameCellProps {
   commandName: string;
+  cancellationRequested?: boolean;
   body: CommandBody;
   clientUserAgent?: string;
 }
@@ -32,7 +33,7 @@ export interface QueuedTaskRowNameCellProps {
 export default function QueuedTaskRowNameCell(
   props: QueuedTaskRowNameCellProps
 ) {
-  const { commandName, body, clientUserAgent } = props;
+  const { commandName, body, clientUserAgent, cancellationRequested } = props;
   const movieIds = [...(body.artistIds ?? [])];
 
   if (body.artistId) {
@@ -46,6 +47,7 @@ export default function QueuedTaskRowNameCell(
     <TableRowCell>
       <span className={styles.commandName}>
         {commandName}
+        {cancellationRequested ? ' — Cancelling…' : ''}
         {sortedArtists.length ? (
           <span> - {formatTitles(sortedArtists.map((a) => a.artistName))}</span>
         ) : null}

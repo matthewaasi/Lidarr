@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import AppState from 'App/State/AppState';
+import Alert from 'Components/Alert';
 import FieldSet from 'Components/FieldSet';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import Table from 'Components/Table/Table';
@@ -48,7 +49,7 @@ const columns = [
 
 export default function QueuedTasks() {
   const dispatch = useDispatch();
-  const { isFetching, isPopulated, items } = useSelector(
+  const { isFetching, isPopulated, items, deleteError } = useSelector(
     (state: AppState) => state.commands
   );
 
@@ -58,6 +59,12 @@ export default function QueuedTasks() {
 
   return (
     <FieldSet legend={translate('Queue')}>
+      {deleteError ? (
+        <Alert>
+          Unable to cancel task. Refresh the task list to check its current
+          state.
+        </Alert>
+      ) : null}
       {isFetching && !isPopulated && <LoadingIndicator />}
 
       {isPopulated && (

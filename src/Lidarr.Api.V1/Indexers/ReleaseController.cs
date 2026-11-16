@@ -192,13 +192,16 @@ namespace Lidarr.Api.V1.Indexers
                 await Send(new { type = "batch", processed, total, records = changes });
             }
 
+            Task Waiting(List<SearchIndexerStatus> indexers) => Send(new { type = "waiting", indexers });
+
             try
             {
                 await Send(new { type = "searching" });
                 var decisions = albumId.HasValue ?
-                    await _releaseSearchService.AlbumSearchProgressive(albumId.Value, cancellationToken, Progress) :
-                    await _releaseSearchService.ArtistSearchProgressive(artistId.Value, cancellationToken, Progress);
+                    await _releaseSearchService.AlbumSearchProgressive(albumId.Value, cancellationToken, Progress, Waiting) :
+                    await _releaseSearchService.ArtistSearchProgressive(artistId.Value, cancellationToken, Progress, Waiting);
                 cancellationToken.ThrowIfCancellationRequested();
+                await Send(new { type = "ranking" });
                 var prioritized = _prioritizeDownloadDecision.PrioritizeDecisions(decisions);
                 cancellationToken.ThrowIfCancellationRequested();
                 await Send(new { type = "complete", records = MapDecisions(prioritized) });

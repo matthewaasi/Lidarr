@@ -147,7 +147,7 @@ test('large result lists render 100 rows while preserving access to every result
   let rows = nodes(instance.render(), (node) => node.type === 'release-row');
   assert.equal(rows.length, 100);
   assert.equal(rows[0].props.guid, '0');
-  assert.match(text(instance.render()), /Checked 500 of 15000/);
+  assert.match(text(instance.render()), /Processing release 500\/15000/);
   instance.setState({ page: 150 });
   rows = nodes(instance.render(), (node) => node.type === 'release-row');
   assert.equal(rows.length, 100);
@@ -164,4 +164,25 @@ test('filter or sort changes reset pagination and partial errors remain visible'
   instance.props = { ...instance.props, isFetching: false, error: { responseJSON: { message: 'Partial results are incomplete' } } };
   assert.match(text(instance.render()), /Partial results are incomplete/);
   assert.equal(nodes(instance.render(), (node) => node.type === 'release-row').length, 100);
+});
+
+
+test('indexer waiting names and ranking survive stream parsing and appear in the popup', () => {
+  const search = harness();
+  search.frame({ type: 'waiting', indexers: [{ id: 1, name: 'Soulseek' }, { id: 2, name: 'Other indexer' }] });
+  let progress = search.updates.at(-1);
+  assert.equal(progress.phase, 'waiting');
+  const instance = component();
+  instance.props = { ...instance.props, searchProgress: progress };
+  assert.match(text(instance.render()), /Waiting for indexers: Soulseek, Other indexer/);
+  search.frame({ type: 'waiting', indexers: [{ id: 1, name: 'Soulseek' }] });
+  instance.props = { ...instance.props, searchProgress: search.updates.at(-1) };
+  assert.match(text(instance.render()), /Waiting for indexers: Soulseek/);
+  assert.doesNotMatch(text(instance.render()), /Other indexer/);
+  search.frame(batch([], 25, 1000));
+  instance.props = { ...instance.props, searchProgress: search.updates.at(-1) };
+  assert.match(text(instance.render()), /Processing release 25\/1000/);
+  search.frame({ type: 'ranking' });
+  instance.props = { ...instance.props, searchProgress: search.updates.at(-1) };
+  assert.match(text(instance.render()), /Ranking evaluated releases/);
 });

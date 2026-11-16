@@ -1,9 +1,11 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Disk;
@@ -214,6 +216,8 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
 
         public void Execute(ScanLibraryAuditCommand message)
         {
+            var cancellationToken = message.CancellationToken;
+            cancellationToken.ThrowIfCancellationRequested();
             if (!message.Versions && !message.Duplicates)
             {
                 throw new BadRequestException("Select at least one audit scan type.");
@@ -234,6 +238,7 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
 
             foreach (var file in files)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var snapshot = Describe(file);
                 try
                 {
@@ -274,11 +279,16 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                             {
                                 _fingerprints.Lookup(new List<LocalTrack> { local }, 0.9);
                             }
+                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _logger.Debug(ex, "Library audit fingerprint lookup failed for {0}", file.Path);
                             }
 
+                            cancellationToken.ThrowIfCancellationRequested();
                             snapshot.AudioRecordingIds = (local.AcoustIdResults ?? new List<string>()).OrderBy(x => x, StringComparer.Ordinal).ToList();
                             snapshot.FingerprintStatus = snapshot.AudioRecordingIds.Count > 0 ? "Recording associations found" : "No confident result / lookup unavailable";
                             if (snapshot.AudioRecordingIds.Count == 0)
@@ -295,6 +305,10 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                             findings.Add(Finding("version", evidence));
                         }
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -325,14 +339,16 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                 var processed = 0;
                 foreach (var group in groups)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var hashes = new Dictionary<string, List<AuditFile>>();
                     foreach (var file in group)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         try
                         {
                             EnsureUnchanged(file);
                             using var stream = _disk.OpenReadStream(file.Path);
-                            var hash = Convert.ToHexString(SHA256.HashData(stream));
+                            var hash = HashFile(stream, cancellationToken);
                             EnsureUnchanged(file);
                             if (!hashes.TryGetValue(hash, out var matches))
                             {
@@ -341,6 +357,10 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                             }
 
                             matches.Add(file);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
                         }
                         catch (Exception ex)
                         {
@@ -355,10 +375,15 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                         var verified = new List<AuditFile>();
                         foreach (var file in match.Value)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             try
                             {
                                 EnsureUnchanged(file);
                                 verified.Add(file);
+                            }
+                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            {
+                                throw;
                             }
                             catch (Exception ex)
                             {
@@ -385,9 +410,13 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Publish only after the scan completes. A failed scan must not resolve previous findings.
             lock (_gate)
             {
+                message.BeginFinalization();
+                _logger.ProgressInfo("Saving completed library audit findings");
                 var existing = _repository.All().ToDictionary(x => x.EvidenceKey);
                 var seen = new HashSet<string>();
                 foreach (var finding in findings)
@@ -431,6 +460,28 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
             }
 
             _logger.ProgressInfo("Library audit finished: {0} findings. Review them under Library → Audit.", findings.Count);
+        }
+
+        private static string HashFile(Stream stream, CancellationToken cancellationToken)
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var buffer = ArrayPool<byte>.Shared.Rent(128 * 1024);
+            try
+            {
+                int length;
+                while ((length = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    hash.AppendData(buffer, 0, length);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return Convert.ToHexString(hash.GetHashAndReset());
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         private void EnsureUnchanged(AuditFile file)

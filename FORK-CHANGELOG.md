@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.2.1.5196-ai.15 — Running task cancellation and named search progress
+
+- List outstanding indexers in interactive search, followed by Processing release X/Y and final ranking.
+- Add cooperative cancellation for running album/artist, missing/cutoff searches and Library Audit tasks.
+- Keep requested cancellations visible until the handler acknowledges stopping; disable unsupported or finalizing tasks.
+- Preserve previous audit findings on cancellation and check cancellation between hashing chunks.
+- Persist queued cancellation, retain running rows until completion and ignore stale cancellation responses after terminal status.
+- Preserve matching rules, provider evaluation order, deduplication, final ranking and already queued downloads.
+- See [release notes](docs/releases/ai.15.md) for installation, supported tasks and verification limits.
+
 ## 3.2.1.5196-ai.14 — Progressive interactive search and cancellation
 
 - Display fully checked release batches with progress and provisional ranking while interactive evaluation continues.

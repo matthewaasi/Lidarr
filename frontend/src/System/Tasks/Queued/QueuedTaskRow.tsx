@@ -36,6 +36,9 @@ function getStatusIconProps(status: string, message: string | undefined) {
         title,
       };
 
+    case 'cancelled':
+      return { name: icons.REMOVE, title: 'Cancelled' };
+
     case 'completed':
       return {
         name: icons.CHECK,
@@ -94,6 +97,8 @@ export interface QueuedTaskRowProps {
   started?: string;
   ended?: string;
   status: string;
+  canCancel?: boolean;
+  cancellationRequested?: boolean;
   duration?: string;
   message?: string;
   body: CommandBody;
@@ -109,6 +114,8 @@ export default function QueuedTaskRow(props: QueuedTaskRowProps) {
     started,
     ended,
     status,
+    canCancel = status === 'queued',
+    cancellationRequested = false,
     duration,
     message,
     body,
@@ -140,7 +147,8 @@ export default function QueuedTaskRow(props: QueuedTaskRowProps) {
 
   const handleCancelPress = useCallback(() => {
     dispatch(cancelCommand({ id }));
-  }, [id, dispatch]);
+    closeCancelConfirmModal();
+  }, [id, dispatch, closeCancelConfirmModal]);
 
   useEffect(() => {
     updateTimeTimeoutId.current = setTimeout(() => {
@@ -172,18 +180,34 @@ export default function QueuedTaskRow(props: QueuedTaskRowProps) {
     triggerIcon = icons.SCHEDULED;
   }
 
+  let cancelTitle =
+    'This running task does not support cancellation or is finishing';
+  if (cancellationRequested) {
+    cancelTitle = 'Cancelling…';
+  } else if (canCancel) {
+    cancelTitle = 'Cancel task';
+  }
+
   return (
     <TableRow>
       <TableRowCell className={styles.trigger}>
         <span className={styles.triggerContent}>
           <Icon name={triggerIcon} title={titleCase(trigger)} />
 
-          <Icon {...getStatusIconProps(status, message)} />
+          <Icon
+            {...getStatusIconProps(status, message)}
+            title={
+              cancellationRequested
+                ? 'Cancelling…'
+                : getStatusIconProps(status, message).title
+            }
+          />
         </span>
       </TableRowCell>
 
       <QueuedTaskRowNameCell
         commandName={commandName}
+        cancellationRequested={cancellationRequested}
         body={body}
         clientUserAgent={clientUserAgent}
       />
@@ -214,9 +238,10 @@ export default function QueuedTaskRow(props: QueuedTaskRowProps) {
       </TableRowCell>
 
       <TableRowCell className={styles.actions}>
-        {status === 'queued' && (
+        {(status === 'queued' || status === 'started') && (
           <IconButton
-            title={translate('RemovedFromTaskQueue')}
+            title={cancelTitle}
+            isDisabled={!canCancel || cancellationRequested}
             name={icons.REMOVE}
             onPress={openCancelConfirmModal}
           />
@@ -227,7 +252,11 @@ export default function QueuedTaskRow(props: QueuedTaskRowProps) {
         isOpen={isCancelConfirmModalOpen}
         kind={kinds.DANGER}
         title={translate('Cancel')}
-        message={translate('CancelPendingTask')}
+        message={
+          status === 'started'
+            ? 'Cancel this running task at the next safe point? Completed work and already queued downloads remain. An in-flight operation may finish first.'
+            : translate('CancelPendingTask')
+        }
         confirmLabel={translate('YesCancel')}
         cancelLabel={translate('NoLeaveIt')}
         onConfirm={handleCancelPress}

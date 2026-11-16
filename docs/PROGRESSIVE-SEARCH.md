@@ -19,3 +19,8 @@ The browser coalesces frames received in one progress event, replaces provisiona
 Tests compare 15,000 synthetic reports through the regular and progressive decision paths, including acceptance/rejection reasons, qualities, custom format scores and ordering. Additional tests cover final duplicate winners and priority, artist album scope, cancellation during fetching and between evaluated batches, exact final API ordering/rejections, incremental parsing, truncated/error streams, late responses after cancellation, and bounded rendering with access to all 15,000 rows.
 
 These are synthetic and mocked-provider checks. They do not replace a captured real Soulseek replay or live browser/proxy verification. No real-provider timing improvement is claimed.
+
+
+## Named loading stages
+
+The popup now distinguishes preparing a search, waiting for named configured indexers, processing release X/Y, and final ranking. Waiting frames carry `{ "type": "waiting", "indexers": [{ "id": 1, "name": "Soulseek" }] }`. The list is updated as providers finish; a provider that returns or fails is removed from the waiting list. Fetch results are still evaluated in their original provider order. A `ranking` frame is sent before final prioritization. Displayed processing counts are evaluated-report checkpoints, rather than the deduplicated result count.

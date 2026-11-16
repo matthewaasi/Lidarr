@@ -14,6 +14,8 @@ namespace Lidarr.Api.V1.Commands
         public string Name { get; set; }
         public string CommandName { get; set; }
         public string Message { get; set; }
+        public bool CanCancel { get; set; }
+        public bool CancellationRequested { get; set; }
         public Command Body { get; set; }
         public CommandPriority Priority { get; set; }
         public CommandStatus Status { get; set; }
@@ -100,6 +102,8 @@ namespace Lidarr.Api.V1.Commands
                 Name = model.Name,
                 CommandName = model.Name.SplitCamelCase(),
                 Message = model.Message,
+                CanCancel = model.Status == CommandStatus.Queued || (model.Status == CommandStatus.Started && model.Body.CanCancelRunning),
+                CancellationRequested = model.Status == CommandStatus.Started && model.Body.CancellationRequested,
                 Body = model.Body,
                 Priority = model.Priority,
                 Status = model.Status,

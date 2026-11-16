@@ -13,6 +13,19 @@ import InteractiveSearchFilterModalConnector from './InteractiveSearchFilterModa
 import InteractiveSearchRow from './InteractiveSearchRow';
 import styles from './InteractiveSearch.css';
 
+export function searchProgressMessage(progress) {
+  if (progress?.phase === 'waiting') {
+    return progress.waitingIndexers?.length ? `Waiting for indexers: ${progress.waitingIndexers.map((indexer) => indexer.name).join(', ')}` : 'Indexer responses received. Preparing releases…';
+  }
+  if (progress?.phase === 'processing') {
+    return `Processing release ${progress.processed}/${progress.total}. Results and ranking are provisional until processing finishes.`;
+  }
+  if (progress?.phase === 'ranking') {
+    return 'Ranking evaluated releases…';
+  }
+  return 'Preparing search… Closing this window cancels further processing.';
+}
+
 const columns = [
   {
     name: 'protocol',
@@ -144,7 +157,7 @@ class InteractiveSearch extends Component {
         {
           isFetching ? <div>
             <LoadingIndicator />
-            <p role="status">{searchProgress?.phase === 'processing' ? `Checked ${searchProgress.processed} of ${searchProgress.total} releases. Results and ranking are provisional until processing finishes.` : 'Waiting for search providers. Closing this window cancels further processing.'}</p>
+            <p role="status">{searchProgressMessage(searchProgress)}</p>
           </div> : null
         }
 
@@ -202,7 +215,7 @@ class InteractiveSearch extends Component {
 
         {items.length > 0 ? <div className={styles.filteredMessage}>
           <button disabled={page <= 1} onClick={() => this.setState({ page: page - 1 })}>Previous</button>{' '}
-          <span>Page {page} of {pageCount} · {items.length} results in this view</span>{' '}
+          <span>Page {page} of {pageCount} Â· {items.length} results in this view</span>{' '}
           <button disabled={page >= pageCount} onClick={() => this.setState({ page: page + 1 })}>Next</button>
         </div> : null}
 

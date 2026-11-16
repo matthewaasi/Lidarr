@@ -11,15 +11,24 @@ using NzbDrone.Core.Indexers;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.ProgressMessaging;
 
 namespace NzbDrone.Core.IndexerSearch
 {
+    public class SearchIndexerStatus
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+
     public interface ISearchForReleases
     {
         Task<List<DownloadDecision>> AlbumSearch(int albumId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch);
         Task<List<DownloadDecision>> ArtistSearch(int artistId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch);
         Task<List<DownloadDecision>> AlbumSearchProgressive(int albumId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress);
         Task<List<DownloadDecision>> ArtistSearchProgressive(int artistId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress);
+        Task<List<DownloadDecision>> AlbumSearchProgressive(int albumId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting);
+        Task<List<DownloadDecision>> ArtistSearchProgressive(int artistId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting);
     }
 
     public class ReleaseSearchService : ISearchForReleases
@@ -59,22 +68,32 @@ namespace NzbDrone.Core.IndexerSearch
 
         public Task<List<DownloadDecision>> AlbumSearchProgressive(int albumId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress)
         {
+            return AlbumSearchProgressive(albumId, cancellationToken, progress, null);
+        }
+
+        public Task<List<DownloadDecision>> AlbumSearchProgressive(int albumId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            return AlbumSearch(_albumService.GetAlbum(albumId), true, true, true, cancellationToken, progress);
+            return AlbumSearch(_albumService.GetAlbum(albumId), true, true, true, cancellationToken, progress, waiting);
         }
 
         public Task<List<DownloadDecision>> ArtistSearchProgressive(int artistId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress)
         {
+            return ArtistSearchProgressive(artistId, cancellationToken, progress, null);
+        }
+
+        public Task<List<DownloadDecision>> ArtistSearchProgressive(int artistId, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            return ArtistSearch(_artistService.GetArtist(artistId), false, true, true, cancellationToken, progress);
+            return ArtistSearch(_artistService.GetArtist(artistId), false, true, true, cancellationToken, progress, waiting);
         }
 
         public Task<List<DownloadDecision>> ArtistSearch(Artist artist, bool missingOnly, bool userInvokedSearch, bool interactiveSearch)
         {
-            return ArtistSearch(artist, missingOnly, userInvokedSearch, interactiveSearch, CancellationToken.None, null);
+            return ArtistSearch(artist, missingOnly, userInvokedSearch, interactiveSearch, ProgressMessageContext.CommandModel?.Body.CancellationToken ?? CancellationToken.None, null);
         }
 
-        private async Task<List<DownloadDecision>> ArtistSearch(Artist artist, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress)
+        private async Task<List<DownloadDecision>> ArtistSearch(Artist artist, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting = null)
         {
             var downloadDecisions = new List<DownloadDecision>();
 
@@ -85,7 +104,7 @@ namespace NzbDrone.Core.IndexerSearch
 
             searchSpec.Albums = albums;
 
-            var decisions = await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec, cancellationToken, progress);
+            var decisions = await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec, cancellationToken, progress, waiting);
             downloadDecisions.AddRange(decisions);
 
             return DeDupeDecisions(downloadDecisions);
@@ -93,10 +112,10 @@ namespace NzbDrone.Core.IndexerSearch
 
         public Task<List<DownloadDecision>> AlbumSearch(Album album, bool missingOnly, bool userInvokedSearch, bool interactiveSearch)
         {
-            return AlbumSearch(album, missingOnly, userInvokedSearch, interactiveSearch, CancellationToken.None, null);
+            return AlbumSearch(album, missingOnly, userInvokedSearch, interactiveSearch, ProgressMessageContext.CommandModel?.Body.CancellationToken ?? CancellationToken.None, null);
         }
 
-        private async Task<List<DownloadDecision>> AlbumSearch(Album album, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress)
+        private async Task<List<DownloadDecision>> AlbumSearch(Album album, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, CancellationToken cancellationToken, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting = null)
         {
             var downloadDecisions = new List<DownloadDecision>();
 
@@ -115,7 +134,7 @@ namespace NzbDrone.Core.IndexerSearch
                 searchSpec.Disambiguation = album.Disambiguation;
             }
 
-            var decisions = await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec, cancellationToken, progress);
+            var decisions = await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec, cancellationToken, progress, waiting);
             downloadDecisions.AddRange(decisions);
 
             return DeDupeDecisions(downloadDecisions);
@@ -145,7 +164,7 @@ namespace NzbDrone.Core.IndexerSearch
             return spec;
         }
 
-        private async Task<List<DownloadDecision>> Dispatch(Func<IIndexer, Task<IList<ReleaseInfo>>> searchAction, SearchCriteriaBase criteriaBase, CancellationToken cancellationToken = default, Func<int, int, List<DownloadDecision>, Task> progress = null)
+        private async Task<List<DownloadDecision>> Dispatch(Func<IIndexer, Task<IList<ReleaseInfo>>> searchAction, SearchCriteriaBase criteriaBase, CancellationToken cancellationToken = default, Func<int, int, List<DownloadDecision>, Task> progress = null, Func<List<SearchIndexerStatus>, Task> waiting = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var indexers = criteriaBase.InteractiveSearch ?
@@ -157,7 +176,23 @@ namespace NzbDrone.Core.IndexerSearch
 
             _logger.ProgressInfo("Searching indexers for {0}. {1} active indexers", criteriaBase, indexers.Count);
 
-            var tasks = indexers.Select(indexer => DispatchIndexer(searchAction, indexer, criteriaBase, cancellationToken));
+            if (waiting != null)
+            {
+                await waiting(indexers.Select(indexer => new SearchIndexerStatus { Id = indexer.Definition.Id, Name = indexer.Definition.Name }).ToList());
+            }
+
+            var tasks = indexers.Select(indexer => DispatchIndexer(searchAction, indexer, criteriaBase, cancellationToken)).ToArray();
+            if (waiting != null)
+            {
+                var pending = Enumerable.Range(0, tasks.Length).ToList();
+                while (pending.Count > 0)
+                {
+                    await Task.WhenAny(pending.Select(index => tasks[index])).WaitAsync(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    pending.RemoveAll(index => tasks[index].IsCompleted);
+                    await waiting(pending.Select(index => new SearchIndexerStatus { Id = indexers[index].Definition.Id, Name = indexers[index].Definition.Name }).ToList());
+                }
+            }
 
             var batch = await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
@@ -180,6 +215,15 @@ namespace NzbDrone.Core.IndexerSearch
             {
                 await progress(0, reports.Count, new List<DownloadDecision>());
                 return await _makeDownloadDecision.GetSearchDecisionProgressive(reports, criteriaBase, cancellationToken, (processed, decisions) => progress(processed, reports.Count, decisions));
+            }
+
+            if (cancellationToken.CanBeCanceled)
+            {
+                return await _makeDownloadDecision.GetSearchDecisionProgressive(reports, criteriaBase, cancellationToken, (processed, _) =>
+                {
+                    _logger.ProgressInfo("Processing release {0}/{1}", processed, reports.Count);
+                    return Task.CompletedTask;
+                });
             }
 
             return _makeDownloadDecision.GetSearchDecision(reports, criteriaBase).ToList();

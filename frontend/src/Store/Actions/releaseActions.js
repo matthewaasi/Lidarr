@@ -270,7 +270,7 @@ export const actionHandlers = handleThunks({
       });
       dispatch(batchActions([
         update({ section, data: items }),
-        set({ section, isFetching: result.phase !== 'complete', isPopulated: true, error: null, searchProgress: { phase: result.phase, processed: result.processed, total: result.total } })
+        set({ section, isFetching: result.phase !== 'complete', isPopulated: true, error: null, searchProgress: { phase: result.phase, processed: result.processed, total: result.total, waitingIndexers: result.waitingIndexers } })
       ]));
     }, (error) => dispatch(set({ section, isFetching: false, error, searchProgress: { phase: 'failed' } })));
   },

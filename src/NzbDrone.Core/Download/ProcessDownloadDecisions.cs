@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.DecisionEngine;
@@ -8,6 +9,7 @@ using NzbDrone.Core.Download.Clients;
 using NzbDrone.Core.Download.Pending;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.ProgressMessaging;
 
 namespace NzbDrone.Core.Download
 {
@@ -37,6 +39,8 @@ namespace NzbDrone.Core.Download
 
         public async Task<ProcessedDecisions> ProcessDecisions(List<DownloadDecision> decisions)
         {
+            var cancellationToken = ProgressMessageContext.CommandModel?.Body.CancellationToken ?? CancellationToken.None;
+            cancellationToken.ThrowIfCancellationRequested();
             var qualifiedReports = GetQualifiedReports(decisions);
             var prioritizedDecisions = _prioritizeDownloadDecision.PrioritizeDecisions(qualifiedReports);
             var grabbed = new List<DownloadDecision>();
@@ -50,6 +54,7 @@ namespace NzbDrone.Core.Download
 
             foreach (var report in prioritizedDecisions)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var downloadProtocol = report.RemoteAlbum.Release.DownloadProtocol;
 
                 // Skip if already grabbed
@@ -116,6 +121,7 @@ namespace NzbDrone.Core.Download
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (pendingAddQueue.Any())
             {
                 _pendingReleaseService.AddMany(pendingAddQueue);

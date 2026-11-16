@@ -4,6 +4,8 @@ namespace NzbDrone.Core.MediaFiles.LibraryAudit
 {
     public class ScanLibraryAuditCommand : Command
     {
+        public override bool SupportsCancellation => true;
+
         public bool Versions { get; set; } = true;
         public bool Duplicates { get; set; } = true;
         public bool Fingerprints { get; set; }

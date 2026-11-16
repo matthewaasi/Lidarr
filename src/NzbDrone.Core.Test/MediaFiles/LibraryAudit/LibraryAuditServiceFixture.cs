@@ -326,6 +326,69 @@ namespace NzbDrone.Core.Test.MediaFilesTests.LibraryAudit
             _deletion.VerifyNoOtherCalls();
         }
 
+        [Test]
+        public void cancelled_scan_does_not_publish_or_resolve_previous_findings()
+        {
+            Add();
+            _service.Execute(new ScanLibraryAuditCommand { Duplicates = false });
+            var previous = _rows.Single();
+            var updated = previous.Updated;
+            _repository.Invocations.Clear();
+            var command = new ScanLibraryAuditCommand { Duplicates = false };
+            _tags.Setup(x => x.ReadTags(It.IsAny<string>())).Callback(() => command.RequestCancellation())
+                .Returns(new ParsedTrackInfo { Title = "Song (Original Mix)", Duration = TimeSpan.FromSeconds(100) });
+            Assert.Throws<OperationCanceledException>(() => _service.Execute(command));
+            Assert.That(_rows.Single(), Is.SameAs(previous));
+            Assert.That(previous.Updated, Is.EqualTo(updated));
+            Assert.That(previous.Status, Is.EqualTo("pending"));
+            _repository.Verify(x => x.Update(It.IsAny<LibraryAuditFinding>()), Times.Never);
+            _repository.Verify(x => x.Insert(It.IsAny<LibraryAuditFinding>()), Times.Never);
+        }
+
+        [Test]
+        public void cancelled_audit_before_start_does_not_read_library_files()
+        {
+            var command = new ScanLibraryAuditCommand();
+            command.RequestCancellation();
+            Assert.Throws<OperationCanceledException>(() => _service.Execute(command));
+            _files.Verify(x => x.All(), Times.Never);
+            _disk.VerifyNoOtherCalls();
+        }
+
+        private sealed class CancellingReadStream : FileStream
+        {
+            private readonly ScanLibraryAuditCommand _command;
+            public int BytesRead { get; private set; }
+
+            public CancellingReadStream(string path, ScanLibraryAuditCommand command)
+                : base(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+            {
+                _command = command;
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                var read = base.Read(buffer, offset, count);
+                BytesRead += read;
+                _command.RequestCancellation();
+                return read;
+            }
+        }
+
+        [Test]
+        public void cancellation_during_hashing_stops_between_chunks_and_does_not_publish()
+        {
+            var first = Add(new string('a', 512 * 1024));
+            var second = Add(new string('a', 512 * 1024));
+            var command = new ScanLibraryAuditCommand { Versions = false };
+            using var stream = new CancellingReadStream(first.Path, command);
+            _disk.Setup(x => x.OpenReadStream(first.Path)).Returns(stream);
+            Assert.Throws<OperationCanceledException>(() => _service.Execute(command));
+            Assert.That(stream.BytesRead, Is.EqualTo(128 * 1024));
+            _disk.Verify(x => x.OpenReadStream(second.Path), Times.Never);
+            _repository.Verify(x => x.Insert(It.IsAny<LibraryAuditFinding>()), Times.Never);
+        }
+
         private TrackFile Add(string content = "same bytes")
         {
             var path = Path.Combine(Path.GetTempPath(), $"lidarr-audit-{Guid.NewGuid():N}.flac");

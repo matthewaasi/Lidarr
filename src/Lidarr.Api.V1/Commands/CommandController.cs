@@ -90,9 +90,12 @@ namespace Lidarr.Api.V1.Commands
         }
 
         [RestDeleteById]
-        public void CancelCommand(int id)
+        public CommandResource CancelCommand(int id)
         {
             _commandQueueManager.Cancel(id);
+            var resource = _commandQueueManager.Get(id).ToResource();
+            BroadcastResourceChange(ModelAction.Updated, resource);
+            return resource;
         }
 
         [NonAction]

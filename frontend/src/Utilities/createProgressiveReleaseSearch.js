@@ -9,6 +9,7 @@ export default function createProgressiveReleaseSearch(payload, onUpdate, onErro
   let processed = 0;
   let total = null;
   let phase = 'searching';
+  let waitingIndexers = [];
   let records = new Map();
   let request = null;
 
@@ -40,7 +41,14 @@ export default function createProgressiveReleaseSearch(payload, onUpdate, onErro
         if (message.type === 'error') {
           throw new Error(message.message);
         }
-        if (message.type === 'batch') {
+        if (message.type === 'waiting') {
+          waitingIndexers = message.indexers;
+          phase = 'waiting';
+        } else if (message.type === 'ranking') {
+          waitingIndexers = [];
+          phase = 'ranking';
+        } else if (message.type === 'batch') {
+          waitingIndexers = [];
           for (const record of message.records) {
             records.set(record.guid, record);
           }
@@ -60,7 +68,7 @@ export default function createProgressiveReleaseSearch(payload, onUpdate, onErro
         }
       }
       if (changed) {
-        onUpdate({ items: Array.from(records.values()), processed, total, phase });
+        onUpdate({ items: Array.from(records.values()), processed, total, phase, waitingIndexers });
       }
       if (final && !terminal) {
         throw new Error('Search ended before completion. Partial results are incomplete.');

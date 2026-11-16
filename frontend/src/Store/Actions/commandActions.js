@@ -4,10 +4,9 @@ import { createThunk, handleThunks } from 'Store/thunks';
 import { isSameCommand } from 'Utilities/Command';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import { hideMessage, showMessage } from './appActions';
-import { removeItem, updateItem } from './baseActions';
+import { removeItem, set, updateItem } from './baseActions';
 import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
-import createRemoveItemHandler from './Creators/createRemoveItemHandler';
 
 //
 // Variables
@@ -100,7 +99,7 @@ function scheduleRemoveCommand(command, dispatch) {
     status
   } = command;
 
-  if (status === 'queued') {
+  if (status === 'queued' || status === 'started') {
     return;
   }
 
@@ -168,7 +167,16 @@ export const actionHandlers = handleThunks({
     executeCommandHelper(payload, dispatch);
   },
 
-  [CANCEL_COMMAND]: createRemoveItemHandler(section, '/command'),
+  [CANCEL_COMMAND]: function(getState, payload, dispatch) {
+    createAjaxRequest({ url: `/command/${payload.id}`, method: 'DELETE', dataType: 'json' }).request.then((command) => {
+      const current = getState().commands?.items.find((item) => item.id === command.id);
+      const ended = current && ['completed', 'failed', 'cancelled', 'aborted', 'orphaned'].includes(current.status);
+      if (!ended || command.status !== 'started') {
+        dispatch(updateItem({ section, ...command }));
+      }
+      dispatch(set({ section, deleteError: null }));
+    }, (xhr) => dispatch(set({ section, deleteError: xhr })));
+  },
 
   [ADD_COMMAND]: function(getState, payload, dispatch) {
     dispatch(updateItem({ section: 'commands', ...payload }));

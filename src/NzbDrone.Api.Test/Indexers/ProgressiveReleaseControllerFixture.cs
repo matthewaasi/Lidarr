@@ -52,9 +52,10 @@ namespace NzbDrone.Api.Test.Indexers
             _controller.Response.Body = _body;
             _decisions = new List<DownloadDecision> { Make("a", 1), Make("b", 2, "Rejected") };
             _search.Setup(x => x.AlbumSearch(1, true, true, true)).ReturnsAsync(_decisions);
-            _search.Setup(x => x.AlbumSearchProgressive(1, It.IsAny<CancellationToken>(), It.IsAny<Func<int, int, List<DownloadDecision>, Task>>()))
-                .Returns(async (int albumId, CancellationToken token, Func<int, int, List<DownloadDecision>, Task> progress) =>
+            _search.Setup(x => x.AlbumSearchProgressive(1, It.IsAny<CancellationToken>(), It.IsAny<Func<int, int, List<DownloadDecision>, Task>>(), It.IsAny<Func<List<SearchIndexerStatus>, Task>>()))
+                .Returns(async (int albumId, CancellationToken token, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting) =>
                 {
+                    await waiting(new List<SearchIndexerStatus> { new SearchIndexerStatus { Id = 9, Name = "Soulseek" } });
                     await progress(1, 2, new List<DownloadDecision> { _decisions[0] });
                     Assert.That(_body.Length, Is.GreaterThan(0));
                     await progress(2, 2, new List<DownloadDecision> { _decisions[1] });
@@ -83,6 +84,8 @@ namespace NzbDrone.Api.Test.Indexers
             var messages = Messages();
             Assert.That(messages.First().GetProperty("type").GetString(), Is.EqualTo("searching"));
             Assert.That(messages.Count(x => x.GetProperty("type").GetString() == "batch"), Is.EqualTo(2));
+            Assert.That(messages.Single(x => x.GetProperty("type").GetString() == "waiting").GetProperty("indexers")[0].GetProperty("name").GetString(), Is.EqualTo("Soulseek"));
+            Assert.That(messages.Any(x => x.GetProperty("type").GetString() == "ranking"), Is.True);
             var final = messages.Last();
             Assert.That(final.GetProperty("type").GetString(), Is.EqualTo("complete"));
             var rows = final.GetProperty("records").EnumerateArray().ToList();
@@ -99,9 +102,10 @@ namespace NzbDrone.Api.Test.Indexers
         {
             using var cancellation = new CancellationTokenSource();
             _controller.HttpContext.RequestAborted = cancellation.Token;
-            _search.Setup(x => x.AlbumSearchProgressive(1, cancellation.Token, It.IsAny<Func<int, int, List<DownloadDecision>, Task>>()))
-                .Returns(async (int id, CancellationToken token, Func<int, int, List<DownloadDecision>, Task> progress) =>
+            _search.Setup(x => x.AlbumSearchProgressive(1, cancellation.Token, It.IsAny<Func<int, int, List<DownloadDecision>, Task>>(), It.IsAny<Func<List<SearchIndexerStatus>, Task>>()))
+                .Returns(async (int id, CancellationToken token, Func<int, int, List<DownloadDecision>, Task> progress, Func<List<SearchIndexerStatus>, Task> waiting) =>
                 {
+                    await waiting(new List<SearchIndexerStatus> { new SearchIndexerStatus { Id = 9, Name = "Soulseek" } });
                     await progress(1, 2, new List<DownloadDecision> { _decisions[0] });
                     cancellation.Cancel();
                     return _decisions;
@@ -115,7 +119,7 @@ namespace NzbDrone.Api.Test.Indexers
         [Test]
         public async Task stream_error_is_explicit_and_never_marks_partial_results_complete()
         {
-            _search.Setup(x => x.AlbumSearchProgressive(1, It.IsAny<CancellationToken>(), It.IsAny<Func<int, int, List<DownloadDecision>, Task>>())).ThrowsAsync(new InvalidOperationException("Plugin failed"));
+            _search.Setup(x => x.AlbumSearchProgressive(1, It.IsAny<CancellationToken>(), It.IsAny<Func<int, int, List<DownloadDecision>, Task>>(), It.IsAny<Func<List<SearchIndexerStatus>, Task>>())).ThrowsAsync(new InvalidOperationException("Plugin failed"));
             await _controller.StreamReleases(1, null);
             Assert.That(Messages().Last().GetProperty("type").GetString(), Is.EqualTo("error"));
             Assert.That(Messages().Any(x => x.GetProperty("type").GetString() == "complete"), Is.False);

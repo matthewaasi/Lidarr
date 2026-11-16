@@ -32,6 +32,7 @@ namespace NzbDrone.Core.Messaging.Commands
         void Fail(CommandModel command, string message, Exception e);
         void Requeue();
         void Cancel(int id);
+        void MarkCancelled(CommandModel command);
         void CleanCommands();
     }
 
@@ -196,15 +197,32 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Complete(CommandModel command, string message)
         {
-            // If the result hasn't been set yet then set it to successful
-            if (command.Result == CommandResult.Unknown)
+            lock (_commandQueue)
             {
-                command.Result = CommandResult.Successful;
+                if (command.Body.CancellationRequested)
+                {
+                    MarkCancelled(command);
+                    return;
+                }
+
+                if (command.Result == CommandResult.Unknown)
+                {
+                    command.Result = CommandResult.Successful;
+                }
+
+                Update(command, CommandStatus.Completed, message);
+                _commandQueue.PulseAllConsumers();
             }
+        }
 
-            Update(command, CommandStatus.Completed, message);
-
-            _commandQueue.PulseAllConsumers();
+        public void MarkCancelled(CommandModel command)
+        {
+            lock (_commandQueue)
+            {
+                command.Result = CommandResult.Unsuccessful;
+                Update(command, CommandStatus.Cancelled, "Cancelled");
+                _commandQueue.PulseAllConsumers();
+            }
         }
 
         public void Fail(CommandModel command, string message, Exception e)
@@ -226,9 +244,21 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Cancel(int id)
         {
-            if (!_commandQueue.RemoveIfQueued(id))
+            lock (_commandQueue)
             {
-                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Unable to cancel task");
+                var command = Get(id);
+                if (_commandQueue.RemoveIfQueued(id))
+                {
+                    MarkCancelled(command);
+                    return;
+                }
+
+                if (command?.Status != CommandStatus.Started || !command.Body.RequestCancellation())
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "This task cannot be cancelled while running, is finishing, or has already ended.");
+                }
+
+                command.Message = "Cancelling…";
             }
         }
 
@@ -259,7 +289,7 @@ namespace NzbDrone.Core.Messaging.Commands
             SetMessage(command, message);
 
             command.EndedAt = DateTime.UtcNow;
-            command.Duration = command.EndedAt.Value.Subtract(command.StartedAt.Value);
+            command.Duration = command.EndedAt.Value.Subtract(command.StartedAt ?? command.QueuedAt);
             command.Status = status;
 
             _logger.Trace("Updating command status");

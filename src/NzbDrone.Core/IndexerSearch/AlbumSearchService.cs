@@ -9,6 +9,7 @@ using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Music;
+using NzbDrone.Core.ProgressMessaging;
 using NzbDrone.Core.Queue;
 
 namespace NzbDrone.Core.IndexerSearch
@@ -46,11 +47,16 @@ namespace NzbDrone.Core.IndexerSearch
 
             foreach (var album in albums.OrderBy(a => a.LastSearchTime ?? DateTime.MinValue))
             {
+                ProgressMessageContext.CommandModel?.Body.CancellationToken.ThrowIfCancellationRequested();
                 List<DownloadDecision> decisions;
 
                 try
                 {
                     decisions = await _releaseSearchService.AlbumSearch(album.Id, false, userInvokedSearch, false);
+                }
+                catch (OperationCanceledException) when (ProgressMessageContext.CommandModel?.Body.CancellationRequested == true)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -58,6 +64,7 @@ namespace NzbDrone.Core.IndexerSearch
                     continue;
                 }
 
+                ProgressMessageContext.CommandModel?.Body.CancellationToken.ThrowIfCancellationRequested();
                 var processed = await _processDownloadDecisions.ProcessDecisions(decisions);
 
                 downloadedCount += processed.Grabbed.Count;
@@ -70,7 +77,9 @@ namespace NzbDrone.Core.IndexerSearch
         {
             foreach (var albumId in message.AlbumIds)
             {
+                message.CancellationToken.ThrowIfCancellationRequested();
                 var decisions = _releaseSearchService.AlbumSearch(albumId, false, message.Trigger == CommandTrigger.Manual, false).GetAwaiter().GetResult();
+                message.CancellationToken.ThrowIfCancellationRequested();
                 var processed = _processDownloadDecisions.ProcessDecisions(decisions).GetAwaiter().GetResult();
 
                 _logger.ProgressInfo("Album search completed. {0} reports downloaded.", processed.Grabbed.Count);

@@ -1,10 +1,12 @@
 # Lidarr AI Fork
 
-**Current version: 3.2.1.5196-ai.14** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
+**Current version: 3.2.1.5196-ai.15** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
 
-Progressive interactive search with cancellation and paginated review, retaining the same matching rules. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
+Named interactive-search progress and cooperative cancellation for running searches and library audits. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
 
 ## Features
+
+- Interactive search lists outstanding indexers, processing release X/Y and final ranking. System → Tasks supports cooperative cancellation for running searches and Library Audit.
 
 - Progressive interactive search with checked result batches, processed/total counts, cancellation on close, and pages of 100 results. Matching rules and final ranking are unchanged.
 
@@ -22,7 +24,7 @@ Progressive interactive search with cancellation and paginated review, retaining
 
 ## Download and install
 
-The ai.14 build package contains a Docker-loadable archive, matching source, installation notes, checksums and verification records. Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.14`. See [ai.14 notes](docs/releases/ai.14.md). Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
+The ai.15 build package contains a Docker-loadable archive, matching source, installation notes, checksums and verification records. Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.15`. See [ai.15 notes](docs/releases/ai.15.md). Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
 
 - Linux amd64 image, based on upstream Lidarr v3.2.1.5196 and the pinned LinuxServer nightly runtime. Assembly version remains 3.2.1.5196 for plugin compatibility.
 - Preserve /config, media mappings, ports, network and database configuration when replacing the container.
@@ -37,6 +39,7 @@ GitHub publication tags use `ai.01`–`ai.09` so releases sort correctly. Docker
 
 | Release | Main changes | Details |
 | --- | --- | --- |
+| [ai.15](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.15) | Running task cancellation and named search progress | [Changelog and features](docs/releases/ai.15.md) |
 | [ai.14](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.14) | Progressive interactive search and cancellation | [Changelog and features](docs/releases/ai.14.md) |
 | [ai.13](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.13) | Audit deletion, file previews and duplicate-copy protection | [Changelog and features](docs/releases/ai.13.md) |
 | [ai.12](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.12) | Queue refresh interval entered in seconds | [Changelog and features](docs/releases/ai.12.md) |
@@ -56,4 +59,4 @@ See [CHANGELOG.md](CHANGELOG.md) for version-by-version changes and [FEATURES.md
 
 ## Source and licensing
 
-ai.14 builds new application binaries from this source. Releases through ai.11 preserve their original build snapshots; their publication reorganization did not rebuild binaries. Original build source archives and metadata are attached to the corresponding releases. [Original build README](docs/ORIGINAL-README.md) and [license](LICENSE.md) are retained. Native Unique Singles follows [gergc/lidarr-plugin-uniquesingles](https://github.com/gergc/lidarr-plugin-uniquesingles); its MIT notice is retained under LICENSES.
+ai.15 builds new application binaries from this source. Releases through ai.11 preserve their original build snapshots; their publication reorganization did not rebuild binaries. Original build source archives and metadata are attached to the corresponding releases. [Original build README](docs/ORIGINAL-README.md) and [license](LICENSE.md) are retained. Native Unique Singles follows [gergc/lidarr-plugin-uniquesingles](https://github.com/gergc/lidarr-plugin-uniquesingles); its MIT notice is retained under LICENSES.

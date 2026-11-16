@@ -80,9 +80,14 @@ namespace NzbDrone.Core.Messaging.Commands
                     ProgressMessageContext.CommandModel = commandModel;
                 }
 
+                command.CancellationToken.ThrowIfCancellationRequested();
                 handler.Execute(command);
 
                 _commandQueueManager.Complete(commandModel, command.CompletionMessage ?? commandModel.Message);
+            }
+            catch (OperationCanceledException) when (command.CancellationRequested)
+            {
+                _commandQueueManager.MarkCancelled(commandModel);
             }
             catch (CommandFailedException ex)
             {

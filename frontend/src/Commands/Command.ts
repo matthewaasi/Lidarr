@@ -23,6 +23,8 @@ interface Command extends ModelBase {
   body: CommandBody;
   priority: string;
   status: string;
+  canCancel?: boolean;
+  cancellationRequested?: boolean;
   result: string;
   queued: string;
   started: string;

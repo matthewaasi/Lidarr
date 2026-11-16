@@ -55,6 +55,44 @@ namespace NzbDrone.Core.Test.IndexerSearchTests
         private static DownloadDecision Make(string guid, int priority, params string[] reasons) => new DownloadDecision(new RemoteAlbum { Release = new ReleaseInfo { Guid = guid, IndexerPriority = priority } }, reasons.Select(x => new Rejection(x)).ToArray());
 
         [Test]
+        public async Task waiting_status_lists_only_indexers_still_running_and_preserves_fetch_order()
+        {
+            var first = new TaskCompletionSource<IList<ReleaseInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var second = new TaskCompletionSource<IList<ReleaseInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _indexer.SetupGet(x => x.Definition).Returns(new IndexerDefinition { Id = 1, Name = "Soulseek" });
+            _indexer.Setup(x => x.Fetch(It.IsAny<AlbumSearchCriteria>())).Returns(first.Task);
+            var other = new Mock<IIndexer>();
+            other.SetupGet(x => x.Definition).Returns(new IndexerDefinition { Id = 2, Name = "Other indexer" });
+            other.Setup(x => x.Fetch(It.IsAny<AlbumSearchCriteria>())).Returns(second.Task);
+            var factory = new Mock<IIndexerFactory>();
+            factory.Setup(x => x.InteractiveSearchEnabled(true)).Returns(new List<IIndexer> { _indexer.Object, other.Object });
+            var albums = new Mock<IAlbumService>();
+            albums.Setup(x => x.GetAlbum(1)).Returns(new Album { Id = 1, ArtistId = 1, Title = "Album" });
+            var artists = new Mock<IArtistService>();
+            artists.Setup(x => x.GetArtist(1)).Returns(new Artist { Id = 1 });
+            var service = new ReleaseSearchService(factory.Object, albums.Object, artists.Object, _decision.Object, LogManager.GetCurrentClassLogger());
+            var statuses = new List<string[]>();
+            var partial = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var search = service.AlbumSearchProgressive(1, CancellationToken.None, (_, _, _) => Task.CompletedTask, waiting =>
+            {
+                statuses.Add(waiting.Select(x => x.Name).ToArray());
+                if (waiting.Count == 1 && waiting[0].Id == 1)
+                {
+                    partial.TrySetResult(true);
+                }
+
+                return Task.CompletedTask;
+            });
+            second.SetResult(new List<ReleaseInfo> { new ReleaseInfo { Guid = "second" } });
+            await partial.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            first.SetResult(new List<ReleaseInfo> { new ReleaseInfo { Guid = "first" } });
+            await search;
+            Assert.That(statuses.First(), Is.EqualTo(new[] { "Soulseek", "Other indexer" }));
+            Assert.That(statuses.Last(), Is.Empty);
+            _decision.Verify(x => x.GetSearchDecisionProgressive(It.Is<List<ReleaseInfo>>(reports => reports[0].Guid == "first" && reports[1].Guid == "second"), It.IsAny<SearchCriteriaBase>(), It.IsAny<CancellationToken>(), It.IsAny<Func<int, List<DownloadDecision>, Task>>()), Times.Once);
+        }
+
+        [Test]
         public async Task completion_preserves_duplicate_winners_and_source_order()
         {
             var baseline = await _service.AlbumSearch(1, true, true, true);
