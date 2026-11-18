@@ -1,10 +1,12 @@
 # Lidarr AI Fork
 
-**Current version: 3.2.1.5196-ai.18** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
+**Current version: 3.2.1.5196-ai.19** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
 
-Batched debug logging, indexed catalog matching, reused search-criteria regexes and periodic processing timings, building on the search caches and bounded workers introduced in ai.17. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
+Album-wide AI reconciliation resolves conflicting file-stage release choices before remapping tracks. Unmatched extra files no longer erase an otherwise identified release. Prior search-performance improvements remain included. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
 
 ## Features
+
+- Album-wide AI reconciliation for conflicting or uncertain file batches, followed by fresh mapping against the selected release, with confidence and duplicate-track validation.
 
 - Batched debug/trace file writes, per-search artist/album indexes, reused criteria regexes, and periodic/stopped-search timing summaries. Matching thresholds and candidate coverage are retained.
 
@@ -30,7 +32,7 @@ Batched debug logging, indexed catalog matching, reused search-criteria regexes 
 
 ## Download and install
 
-The ai.18 build package contains a Docker-loadable archive, matching source, installation notes, checksums and verification records. Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.18`. See [ai.18 notes](docs/releases/ai.18.md). Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
+The ai.19 build package contains a Docker-loadable archive, matching source, installation notes, checksums and verification records. Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.19`. See [ai.19 notes](docs/releases/ai.19.md). Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
 
 - Linux amd64 image, based on upstream Lidarr v3.2.1.5196 and the pinned LinuxServer nightly runtime. Assembly version remains 3.2.1.5196 for plugin compatibility.
 - Preserve /config, media mappings, ports, network and database configuration when replacing the container.
@@ -45,6 +47,7 @@ GitHub publication tags use `ai.01`–`ai.09` so releases sort correctly. Docker
 
 | Release | Main changes | Details |
 | --- | --- | --- |
+| [ai.19](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.19) | Album-wide AI release reconciliation and constrained remapping | [Changelog and features](docs/releases/ai.19.md) |
 | [ai.18](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.18) | Batched logging, indexed matching and periodic search timings | [Changelog and features](docs/releases/ai.18.md) |
 | [ai.17](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.17) | Search caches, bounded workers and processing timings | [Changelog and features](docs/releases/ai.17.md) |
 | [ai.16](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.16) | Live Audit-page phase progress and file counters | [Changelog and features](docs/releases/ai.16.md) |
@@ -68,4 +71,4 @@ See [CHANGELOG.md](CHANGELOG.md) for version-by-version changes and [FEATURES.md
 
 ## Source and licensing
 
-ai.18 builds new application binaries from this source. Releases through ai.11 preserve their original build snapshots; their publication reorganization did not rebuild binaries. Original build source archives and metadata are attached to the corresponding releases. [Original build README](docs/ORIGINAL-README.md) and [license](LICENSE.md) are retained. Native Unique Singles follows [gergc/lidarr-plugin-uniquesingles](https://github.com/gergc/lidarr-plugin-uniquesingles); its MIT notice is retained under LICENSES.
+ai.19 builds new application binaries from this source. Releases through ai.11 preserve their original build snapshots; their publication reorganization did not rebuild binaries. Original build source archives and metadata are attached to the corresponding releases. [Original build README](docs/ORIGINAL-README.md) and [license](LICENSE.md) are retained. Native Unique Singles follows [gergc/lidarr-plugin-uniquesingles](https://github.com/gergc/lidarr-plugin-uniquesingles); its MIT notice is retained under LICENSES.

@@ -1,4 +1,6 @@
-# Features — 3.2.1.5196-ai.18
+# Features — 3.2.1.5196-ai.19
+
+- Album-wide AI reconciliation resolves conflicting file-stage choices before fresh mapping against one release. Unmatched files retain independent no-match decisions.
 
 - Batched debug/trace file logging, indexed catalog matching, reused search-criteria regexes and periodic timing summaries, including stopped searches.
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Moq;
 using Newtonsoft.Json;
@@ -112,6 +113,244 @@ namespace NzbDrone.Core.Test.MediaFiles.TrackImport.Identification
                 ["reason"] = "Album evidence",
                 ["files"] = rows
             };
+        }
+
+        private void ConflictingFileStages(Func<JObject, JObject> reconcile, Func<JObject, JObject> remap = null, string reconciliationFinish = "stop", bool refusal = false)
+        {
+            _settings.StageFileCount = 1;
+            var release = _candidates[0].AlbumRelease;
+            for (var i = 1; i < 3; i++)
+            {
+                _candidates.Add(new CandidateAlbumRelease(new AlbumRelease
+                {
+                    Id = 20 + i, AlbumId = 10, Title = "Edition " + i, Album = release.Album, Tracks = release.Tracks.Value
+                }));
+            }
+
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, _) =>
+            {
+                var input = Input(payload);
+                if ((string)input["stage"] == "album_reconciliation")
+                {
+                    Assert.That(((JArray)input["files"]).Count, Is.EqualTo(2));
+                    Assert.That(((JArray)input["candidates"]).Count, Is.EqualTo(3));
+                    Assert.That(((JArray)input["candidates"]).All(c => ((JArray)c["tracks"]).Count == 2), Is.True);
+                    Assert.That(payload["response_format"]["json_schema"]["schema"]["properties"]["files"], Is.Null);
+                    var response = Response(reconcile(input), reconciliationFinish);
+                    if (refusal)
+                    {
+                        response["choices"][0]["message"]["refusal"] = "Refused";
+                    }
+
+                    return response;
+                }
+
+                if (input["stage"] != null)
+                {
+                    Assert.That(((JArray)input["candidates"]).Count, Is.EqualTo(1));
+                    Assert.That(((JArray)input["candidates"][0]["tracks"]).Count, Is.EqualTo(2));
+                    return Response(remap == null ? StageAnswer(input) : remap(input));
+                }
+
+                var candidate = ((JArray)input["candidates"])[(string)input["files"][0]["fileId"] == "f0" ? 0 : 1];
+                input["candidates"] = new JArray(candidate.DeepClone());
+                return Response(StageAnswer(input));
+            });
+        }
+
+        private static JObject AlbumSelection(string id, double confidence = 0.99)
+        {
+            return new JObject { ["candidateId"] = id, ["confidence"] = confidence, ["reason"] = "Album-wide edition evidence" };
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void conflicting_file_stages_should_reconcile_all_candidates_and_remap_every_file(bool reviewMode)
+        {
+            _settings.Automatic = !reviewMode;
+            ConflictingFileStages(_ => AlbumSelection("c2"));
+            Identify();
+            Assert.That(_local.AlbumRelease.Id, Is.EqualTo(22));
+            Assert.That(_local.LocalTracks.Select(f => f.AiMatch.TrackId), Is.EqualTo(new[] { "c2t0", "c2t1" }));
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Proposed), Is.True);
+            Assert.That(_local.LocalTracks.All(f => f.AiMatch.Accepted), Is.EqualTo(!reviewMode));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(5));
+        }
+
+        [TestCase(null, 0.99)]
+        [TestCase("c2", 0.94)]
+        public void unresolved_or_low_confidence_album_reconciliation_should_remain_manual(string id, double confidence)
+        {
+            ConflictingFileStages(_ => AlbumSelection(id, confidence));
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted && !f.AiMatch.IsError), Is.True);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("Album-wide AI reconciliation requires review"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(3));
+        }
+
+        [Test]
+        public void reconciliation_cannot_invent_candidate_ids()
+        {
+            ConflictingFileStages(_ => AlbumSelection("invented"));
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted && f.Tracks.Count == 0), Is.True);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("outside the supplied candidates"));
+        }
+
+        [Test]
+        public void duplicate_tracks_during_reconciled_remapping_invalidate_every_file()
+        {
+            ConflictingFileStages(_ => AlbumSelection("c2"), input =>
+            {
+                var answer = StageAnswer(input);
+                answer["files"][0]["trackId"] = "c2t0";
+                return answer;
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted && f.Tracks.Count == 0), Is.True);
+        }
+
+        [Test]
+        public void later_remap_failure_cannot_apply_earlier_success()
+        {
+            ConflictingFileStages(_ => AlbumSelection("c2"), input =>
+            {
+                if ((string)input["files"][0]["fileId"] == "f1")
+                {
+                    throw new InvalidDataException("Later constrained stage failed");
+                }
+
+                return StageAnswer(input);
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => f.Tracks.Count == 0 && !f.AiMatch.Accepted), Is.True);
+        }
+
+        [Test]
+        public void reconciliation_context_limit_should_stop_with_actionable_review()
+        {
+            ConflictingFileStages(_ => throw new LmStudioContextException());
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("increase LM Studio context"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(3));
+        }
+
+        [TestCase("length", false)]
+        [TestCase("stop", true)]
+        [TestCase("tool_calls", false)]
+        public void incomplete_or_refused_reconciliation_cannot_select_release(string finish, bool refusal)
+        {
+            ConflictingFileStages(_ => AlbumSelection("c2"), reconciliationFinish: finish, refusal: refusal);
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("did not complete album-wide reconciliation"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(3));
+        }
+
+        [Test]
+        public void album_wide_request_limit_must_not_truncate_files_or_candidates()
+        {
+            _settings.MaxRequestCharacters = 12000;
+            foreach (var file in _local.LocalTracks)
+            {
+                file.FileTrackInfo.Title = new string('x', 7000);
+            }
+
+            ConflictingFileStages(_ => AlbumSelection("c2"));
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("exceeds the request limit"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(2));
+        }
+
+        [Test]
+        public void independent_album_selection_can_retain_one_uncertain_file_without_repeating_reconciliation()
+        {
+            ConflictingFileStages(_ => AlbumSelection("c2", 0.96), input =>
+            {
+                var answer = StageAnswer(input);
+                if ((string)input["files"][0]["fileId"] == "f1")
+                {
+                    answer["candidateId"] = null;
+                    answer["files"][0]["trackId"] = null;
+                    answer["files"][0]["status"] = "review";
+                }
+
+                return answer;
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease.Id, Is.EqualTo(22));
+            Assert.That(_local.AiMatch.Confidence, Is.EqualTo(0.96));
+            Assert.That(_local.LocalTracks[0].AiMatch.Accepted, Is.True);
+            Assert.That(_local.LocalTracks[1].AiMatch.Accepted, Is.False);
+            Assert.That(_local.LocalTracks[1].AiMatch.Status, Is.EqualTo("review"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(5));
+        }
+
+        [Test]
+        public void all_unmatched_files_should_not_request_album_reconciliation()
+        {
+            _settings.StageFileCount = 1;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, _) =>
+            {
+                var answer = StageAnswer(Input(payload));
+                answer["candidateId"] = null;
+                answer["files"][0]["status"] = "no_match";
+                answer["files"][0]["trackId"] = null;
+                return Response(answer);
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("No matching release found"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(2));
+        }
+
+        [Test]
+        public void album_selection_without_any_remapped_tracks_should_explain_mapping_failure()
+        {
+            ConflictingFileStages(_ => AlbumSelection("c2"), input =>
+            {
+                var answer = StageAnswer(input);
+                answer["candidateId"] = null;
+                answer["files"][0]["trackId"] = null;
+                answer["files"][0]["status"] = "no_match";
+                return answer;
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease, Is.Null);
+            Assert.That(_local.LocalTracks.All(f => !f.AiMatch.Accepted), Is.True);
+            Assert.That(_local.AiMatch.Reason, Does.Contain("could not produce a consistent file mapping"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(5));
+        }
+
+        [Test]
+        public void unmatched_file_stage_should_not_erase_identified_release()
+        {
+            _settings.StageFileCount = 1;
+            _client.Setup(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>())).Returns<JObject, LmStudioSettings>((payload, _) =>
+            {
+                var answer = StageAnswer(Input(payload));
+                if ((string)answer["files"][0]["fileId"] == "f1")
+                {
+                    answer["candidateId"] = null;
+                    answer["confidence"] = 0;
+                    answer["files"][0]["status"] = "no_match";
+                    answer["files"][0]["trackId"] = null;
+                }
+
+                return Response(answer);
+            });
+            Identify();
+            Assert.That(_local.AlbumRelease.Id, Is.EqualTo(20));
+            Assert.That(_local.LocalTracks[0].AiMatch.Accepted, Is.True);
+            Assert.That(_local.LocalTracks[1].AiMatch.Accepted, Is.False);
+            Assert.That(_local.LocalTracks[1].AiMatch.Status, Is.EqualTo("no_match"));
+            _client.Verify(c => c.Complete(It.IsAny<JObject>(), It.IsAny<LmStudioSettings>()), Times.Exactly(2));
         }
 
         [Test]

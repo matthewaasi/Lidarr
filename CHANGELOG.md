@@ -2,6 +2,16 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.19 — Album-wide AI reconciliation
+
+- File batches that select different editions or leave release identity uncertain trigger one album-wide AI selection using all original files and candidates.
+- Remap all files against the complete selected release; discard earlier conflicting mappings and validate the final mapping globally.
+- A no-match-only batch no longer erases the release identified by other batches. Individually uncertain files remain review items after independent album selection.
+- Preserve Review mode, confidence thresholds, valid candidate/track IDs, request limits and atomic failure handling. Uncertain editions, context/output limits and invalid mappings still require review.
+- Existing import reviews need a fresh Retry Matching attempt after upgrading. No schema migration is introduced; ai.18 search-performance changes remain included.
+
+See [ai.19 release notes](docs/releases/ai.19.md).
+
 ## 3.2.1.5196-ai.18 — Batched logging and indexed matching
 
 - Batch debug/trace file writes through bounded asynchronous queues while retaining cleansing, rotation and graceful flushing. Info logging stays synchronous.
