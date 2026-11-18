@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
 using Npgsql;
@@ -21,6 +22,18 @@ namespace NzbDrone.Core.Test.MusicTests.ArtistRepositoryTests
     {
         private ArtistRepository _artistRepo;
         private ArtistMetadataRepository _artistMetadataRepo;
+
+        [Test]
+        public void search_index_matches_database_exact_lookup()
+        {
+            GivenArtists();
+            var index = new ArtistSearchIndex(_artistRepo.All().ToList());
+            foreach (var name in new[] { "The Black Keys", "THE BLACK EYED PEAS", "unknown", "The_Black_Keys" })
+            {
+                var clean = Parser.Parser.CleanArtistName(name).ToLowerInvariant();
+                Assert.That(index.FindExact(clean)?.Id, Is.EqualTo(_artistRepo.FindByName(clean)?.Id));
+            }
+        }
 
         [SetUp]
         public void Setup()

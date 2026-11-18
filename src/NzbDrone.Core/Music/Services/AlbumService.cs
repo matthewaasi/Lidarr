@@ -111,7 +111,9 @@ namespace NzbDrone.Core.Music
 
         private Album FindByTitleAndYearUncached(int artistMetadataId, string title, int? year)
         {
-            var album = _albumRepository.FindByTitle(artistMetadataId, title);
+            var album = ReleaseEvaluationContext.IsActive
+                ? ReleaseEvaluationContext.Read("album.index", artistMetadataId, () => new AlbumSearchIndex(GetAlbumsByArtistMetadataId(artistMetadataId))).Find(title)
+                : _albumRepository.FindByTitle(artistMetadataId, title);
 
             if (album == null)
             {

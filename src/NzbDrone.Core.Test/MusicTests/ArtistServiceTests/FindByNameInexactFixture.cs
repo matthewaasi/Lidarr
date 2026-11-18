@@ -22,9 +22,10 @@ namespace NzbDrone.Core.Test.MusicTests.ArtistServiceTests
                 Subject.FindByName("Unknown Name").Should().BeNull();
             }
 
-            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Once());
+            Mocker.GetMock<IArtistRepository>().Verify(x => x.All(), Times.Once());
+            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Never());
             Subject.FindByName("Unknown Name");
-            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Exactly(2));
+            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Once());
         }
 
         private List<Artist> _artists;

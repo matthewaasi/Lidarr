@@ -16,6 +16,8 @@ namespace NzbDrone.Core.DecisionEngine
         private long _hits;
         private long _misses;
 
+        public static bool IsActive => Ambient.Value != null;
+
         public ReleaseEvaluationContext()
         {
             _previous = Ambient.Value;

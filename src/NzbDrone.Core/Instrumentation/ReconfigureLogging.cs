@@ -5,6 +5,7 @@ using NLog.Config;
 using NLog.Targets;
 using NLog.Targets.Syslog;
 using NLog.Targets.Syslog.Settings;
+using NLog.Targets.Wrappers;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation;
@@ -95,7 +96,9 @@ namespace NzbDrone.Core.Instrumentation
 
         private void ReconfigureFile()
         {
-            foreach (var target in LogManager.Configuration.AllTargets.OfType<CleansingFileTarget>())
+            foreach (var target in LogManager.Configuration.AllTargets
+                .Select(t => t is AsyncTargetWrapper wrapper ? wrapper.WrappedTarget : t)
+                .OfType<CleansingFileTarget>().Distinct())
             {
                 target.MaxArchiveFiles = _configFileProvider.LogRotate;
                 target.ArchiveAboveSize = _configFileProvider.LogSizeLimit.Megabytes();

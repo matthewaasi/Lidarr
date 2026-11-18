@@ -68,51 +68,74 @@ namespace NzbDrone.Core.DecisionEngine
             var windowSize = workers;
             _logger.ProgressInfo("Processing {0} releases with {1} workers", reports.Count, workers);
 
-            // Bounded windows keep memory, cancellation and progressive output predictable.
-            for (var offset = 0; offset < reports.Count;)
+            var processed = 0;
+            var status = "stopped";
+            var heartbeat = Stopwatch.StartNew();
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var windowTimer = Stopwatch.StartNew();
-                var count = Math.Min(windowSize, reports.Count - offset);
-                var results = new DownloadDecision[count];
-                var windowStart = offset;
-                await Task.Run(
-                    () => Parallel.For(
-                        0,
-                        count,
-                        new ParallelOptions
-                        {
-                            CancellationToken = cancellationToken,
-                            MaxDegreeOfParallelism = workers
-                        },
-                        index =>
-                        {
-                            results[index] = GetAlbumDecisions(new List<ReleaseInfo> { reports[windowStart + index] }, false, criteria, cancellationToken, logSummary: false).SingleOrDefault();
-                        }),
-                    cancellationToken);
+                // Bounded windows keep memory, cancellation and progressive output predictable.
+                for (var offset = 0; offset < reports.Count;)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var windowTimer = Stopwatch.StartNew();
+                    var count = Math.Min(windowSize, reports.Count - offset);
+                    var results = new DownloadDecision[count];
+                    var windowStart = offset;
+                    await Task.Run(
+                        () => Parallel.For(
+                            0,
+                            count,
+                            new ParallelOptions
+                            {
+                                CancellationToken = cancellationToken,
+                                MaxDegreeOfParallelism = workers
+                            },
+                            index =>
+                            {
+                                results[index] = GetAlbumDecisions(new List<ReleaseInfo> { reports[windowStart + index] }, false, criteria, cancellationToken, logSummary: false).SingleOrDefault();
+                            }),
+                        cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var batch = results.Where(x => x != null).ToList();
+                    decisions.AddRange(batch);
+                    windowSize = Math.Clamp((int)(count * 250.0 / Math.Max(1, windowTimer.Elapsed.TotalMilliseconds)), workers, 100);
+                    processed = offset + count;
+                    await progress(processed, batch);
+                    offset += count;
+                    if (heartbeat.Elapsed >= TimeSpan.FromSeconds(5))
+                    {
+                        LogSearchTiming("progress", processed, reports.Count, workers, totalTimer, context);
+                        heartbeat.Restart();
+                    }
+                }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                var batch = results.Where(x => x != null).ToList();
-                decisions.AddRange(batch);
-                windowSize = Math.Clamp((int)(count * 250.0 / Math.Max(1, windowTimer.Elapsed.TotalMilliseconds)), workers, 100);
-                await progress(offset + count, batch);
-                offset += count;
+                if (reports.Count == 0)
+                {
+                    await progress(0, new List<DownloadDecision>());
+                }
+
+                status = "completed";
+                return decisions;
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            if (reports.Count == 0)
+            finally
             {
-                await progress(0, new List<DownloadDecision>());
+                LogSearchTiming(status, processed, reports.Count, workers, totalTimer, context);
             }
+        }
 
+        private void LogSearchTiming(string status, int processed, int total, int workers, Stopwatch timer, ReleaseEvaluationContext context)
+        {
             _logger.Info(
-                "Release processing completed: {0} reports in {1:F3}s ({2:F1}/sec), {3} workers; {4}",
-                reports.Count,
-                totalTimer.Elapsed.TotalSeconds,
-                reports.Count / Math.Max(0.001, totalTimer.Elapsed.TotalSeconds),
+                "Release processing {0}: {1}/{2} reports in {3:F3}s ({4:F1}/sec), {5} workers; {6}",
+                status,
+                processed,
+                total,
+                timer.Elapsed.TotalSeconds,
+                processed / Math.Max(0.001, timer.Elapsed.TotalSeconds),
                 workers,
                 context.Summary());
-            return decisions;
         }
 
         private static int SearchWorkers()

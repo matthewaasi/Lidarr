@@ -4,6 +4,7 @@ using System.IO;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
+using NLog.Targets.Wrappers;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Sentry;
@@ -136,6 +137,13 @@ namespace NzbDrone.Common.Instrumentation
 
         private static void RegisterAppFile(IAppFolderInfo appFolderInfo, string name, string fileName, int maxArchiveFiles, LogLevel minLogLevel)
         {
+            var target = CreateAppFileTarget(appFolderInfo, name, fileName, maxArchiveFiles);
+            LogManager.Configuration.AddTarget(name, target);
+            LogManager.Configuration.LoggingRules.Add(new LoggingRule("*", minLogLevel, target));
+        }
+
+        private static Target CreateAppFileTarget(IAppFolderInfo appFolderInfo, string name, string fileName, int maxArchiveFiles)
+        {
             var fileTarget = new CleansingFileTarget();
 
             fileTarget.Name = name;
@@ -151,10 +159,23 @@ namespace NzbDrone.Common.Instrumentation
             fileTarget.ArchiveNumbering = ArchiveNumberingMode.Rolling;
             fileTarget.Layout = FileLogLayout;
 
-            var loggingRule = new LoggingRule("*", minLogLevel, fileTarget);
+            // Debug/trace can emit dozens of lines per release. Batch those writes rather
+            // than opening/flushing/closing the appdata file on every worker log call.
+            Target target = fileTarget;
+            if (name == "appFileDebug" || name == "appFileTrace")
+            {
+                fileTarget.Name = name + "File";
+                target = new AsyncTargetWrapper(fileTarget)
+                {
+                    Name = name,
+                    BatchSize = 500,
+                    QueueLimit = 10000,
+                    OverflowAction = AsyncTargetWrapperOverflowAction.Block,
+                    TimeToSleepBetweenBatches = 50
+                };
+            }
 
-            LogManager.Configuration.AddTarget(name, fileTarget);
-            LogManager.Configuration.LoggingRules.Add(loggingRule);
+            return target;
         }
 
         private static void RegisterUpdateFile(IAppFolderInfo appFolderInfo)

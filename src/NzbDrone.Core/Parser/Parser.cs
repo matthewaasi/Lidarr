@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 
@@ -366,7 +367,8 @@ namespace NzbDrone.Core.Parser
                 var escapedArtist = Regex.Escape(artistName.RemoveAccent()).Replace(@"\ ", @"[\W_]");
                 var escapedAlbums = string.Join("|", album.Select(s => Regex.Escape(s.Title.RemoveAccent())).ToList()).Replace(@"\ ", @"[\W_]");
 
-                var releaseRegex = new Regex(@"^(\W*|\b)(?<artist>" + escapedArtist + @")(\W*|\b).*(\W*|\b)(?<album>" + escapedAlbums + @")(\W*|\b)", RegexOptions.IgnoreCase);
+                var pattern = @"^(\W*|\b)(?<artist>" + escapedArtist + @")(\W*|\b).*(\W*|\b)(?<album>" + escapedAlbums + @")(\W*|\b)";
+                var releaseRegex = ReleaseEvaluationContext.Read("parse.criteria-regex", (pattern, System.Globalization.CultureInfo.CurrentCulture.Name), () => new Regex(pattern, RegexOptions.IgnoreCase));
 
                 var match = releaseRegex.Matches(simpleTitle);
 

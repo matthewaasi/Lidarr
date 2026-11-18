@@ -112,7 +112,17 @@ namespace NzbDrone.Core.Music
 
         private Artist FindByNameUncached(string title)
         {
+            if (ReleaseEvaluationContext.IsActive)
+            {
+                return SearchIndex().FindExact(title.CleanArtistName().ToLowerInvariant());
+            }
+
             return _artistRepository.FindByName(title.CleanArtistName());
+        }
+
+        private ArtistSearchIndex SearchIndex()
+        {
+            return ReleaseEvaluationContext.Read("artist.index", 0, () => new ArtistSearchIndex(_artistRepository.All().ToList()));
         }
 
         public List<Tuple<Func<Artist, string, double>, string>> ArtistScoringFunctions(string title, string cleanTitle)
@@ -144,6 +154,11 @@ namespace NzbDrone.Core.Music
 
         private Artist FindByNameInexactUncached(string title)
         {
+            if (ReleaseEvaluationContext.IsActive)
+            {
+                return SearchIndex().FindInexact(title);
+            }
+
             var artists = GetAllArtists();
 
             foreach (var func in ArtistScoringFunctions(title, title.CleanArtistName()))

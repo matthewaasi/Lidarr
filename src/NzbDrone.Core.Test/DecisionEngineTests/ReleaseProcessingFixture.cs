@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using NLog;
+using NLog.Config;
+using NLog.Targets;
 using NUnit.Framework;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine;
@@ -25,7 +27,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
     [TestFixture]
     public class ReleaseProcessingFixture
     {
-        private static DownloadDecisionMaker Create(IEnumerable<IDecisionEngineSpecification> specifications)
+        private static DownloadDecisionMaker Create(IEnumerable<IDecisionEngineSpecification> specifications, Logger logger = null)
         {
             var parsing = new Mock<IParsingService>();
             parsing.Setup(x => x.Map(It.IsAny<ParsedAlbumInfo>(), It.IsAny<SearchCriteriaBase>()))
@@ -37,7 +39,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                 });
             var formats = new Mock<ICustomFormatCalculationService>();
             formats.Setup(x => x.ParseCustomFormat(It.IsAny<RemoteAlbum>(), It.IsAny<long>())).Returns(new List<CustomFormat>());
-            return new DownloadDecisionMaker(specifications, parsing.Object, formats.Object, Mock.Of<IRemoteAlbumAggregationService>(), LogManager.GetCurrentClassLogger());
+            return new DownloadDecisionMaker(specifications, parsing.Object, formats.Object, Mock.Of<IRemoteAlbumAggregationService>(), logger ?? LogManager.GetCurrentClassLogger());
         }
 
         private static List<ReleaseInfo> Reports(int count)
@@ -100,6 +102,25 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             Assert.That(ReleaseEvaluationContext.Read("test", 1, () => "outside"), Is.EqualTo("outside"));
             var result = await service.GetSearchDecisionProgressive(Reports(1), Criteria(true), CancellationToken.None, (_, _) => Task.CompletedTask);
             Assert.That(result.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void cancelled_search_emits_final_timing_and_processed_count()
+        {
+            var target = new MemoryTarget { Layout = "${message}" };
+            var config = new LoggingConfiguration();
+            config.AddRule(LogLevel.Info, LogLevel.Fatal, target);
+            using var factory = new LogFactory { Configuration = config };
+            using var cancellation = new CancellationTokenSource();
+            var service = Create(Array.Empty<IDecisionEngineSpecification>(), factory.GetLogger("search"));
+            var processed = 0;
+            Assert.ThrowsAsync<OperationCanceledException>(() => service.GetSearchDecisionProgressive(Reports(150), Criteria(true), cancellation.Token, (count, _) =>
+            {
+                processed = count;
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            }));
+            Assert.That(target.Logs.Any(x => x.StartsWith($"Release processing stopped: {processed}/150 reports")), Is.True);
         }
 
         [Test]
