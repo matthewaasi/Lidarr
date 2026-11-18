@@ -5,6 +5,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common;
 using NzbDrone.Core.Datastore.Events;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music.Events;
@@ -182,6 +183,11 @@ namespace NzbDrone.Core.MediaFiles
         }
 
         public List<TrackFile> GetFilesByAlbum(int albumId)
+        {
+            return new List<TrackFile>(ReleaseEvaluationContext.Read("files.album", albumId, () => GetFilesByAlbumUncached(albumId)));
+        }
+
+        private List<TrackFile> GetFilesByAlbumUncached(int albumId)
         {
             return _mediaFileRepository.GetFilesByAlbum(albumId);
         }

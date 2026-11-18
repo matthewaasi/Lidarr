@@ -1,4 +1,7 @@
-# Features — 3.2.1.5196-ai.12
+# Features — 3.2.1.5196-ai.17
+
+- Search-scoped matching and album-state caches, bounded workers, stable ordered progress, full interactive rejection details, and processing throughput/stage timings.
+- Live Library Audit phase percentages and counters; running task cancellation and named search progress remain available.
 
 - LM Studio album/track identification with Review and Automatic modes, strict result validation and configurable request settings.
 - Native release-type search buttons on artist pages.

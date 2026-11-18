@@ -2,6 +2,17 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.17 — Faster release evaluation
+
+- Cache exact/fuzzy artist and album matches, candidate albums, album files, missing tracks and history within each search, including unsuccessful matches.
+- Evaluate bounded windows with configurable workers (`LIDARR_RELEASE_WORKERS`, 1–16; default CPU count capped at four), returning decisions in input order and retaining cooperative cancellation.
+- Materialize shared lazy entities once across workers. Keep caches isolated between searches and bypass them outside release evaluation.
+- Automatic searches evaluate cheap quality/requested-album/title gates first within their original priority group and stop after a permanent rejection. Interactive searches preserve all rejection reasons and their order. Temporary-only rejections remain distinct from permanent rejections.
+- Log elapsed processing time, throughput, worker count, cache hits/misses and cumulative stage timings.
+- No database migration. Production 500 releases/sec remains a deployment benchmark target, not a measured claim.
+
+See [ai.17 release notes](docs/releases/ai.17.md) for verification and installation.
+
 ## 3.2.1.5196-ai.12 — Queue refresh interval in seconds
 
 - Settings → Download Clients → Queue now accepts a whole number of seconds from 1–86,400; default 60 seconds.

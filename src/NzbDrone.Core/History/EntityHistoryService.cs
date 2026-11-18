@@ -6,6 +6,7 @@ using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Datastore;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.Events;
@@ -78,6 +79,11 @@ namespace NzbDrone.Core.History
         }
 
         public List<EntityHistory> GetByAlbum(int albumId, EntityHistoryEventType? eventType)
+        {
+            return new List<EntityHistory>(ReleaseEvaluationContext.Read("history.album", (albumId, eventType), () => GetByAlbumUncached(albumId, eventType)));
+        }
+
+        private List<EntityHistory> GetByAlbumUncached(int albumId, EntityHistoryEventType? eventType)
         {
             return _historyRepository.GetByAlbum(albumId, eventType);
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Test.Framework;
 
@@ -11,6 +12,16 @@ namespace NzbDrone.Core.Test.MusicTests.AlbumRepositoryTests
     [TestFixture]
     public class AlbumServiceYearMatchingFixture : CoreTest<AlbumService>
     {
+        [Test]
+        public void search_cache_keeps_years_separate_and_reuses_candidates()
+        {
+            using var scope = new ReleaseEvaluationContext();
+            Subject.FindByTitleAndYearInexact(0, "Greatest Hits", 2010).Id.Should().Be(1);
+            Subject.FindByTitleAndYearInexact(0, "Greatest Hits", 2020).Id.Should().Be(2);
+            Subject.FindByTitleAndYearInexact(0, "Greatest Hits", 2010).Id.Should().Be(1);
+            Mocker.GetMock<IAlbumRepository>().Verify(x => x.GetAlbumsByArtistMetadataId(0), Times.Once());
+        }
+
         private List<Album> _albums;
 
         [SetUp]

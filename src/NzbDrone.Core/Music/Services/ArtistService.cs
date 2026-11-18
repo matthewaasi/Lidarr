@@ -4,6 +4,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music.Events;
 using NzbDrone.Core.Parser;
@@ -106,6 +107,11 @@ namespace NzbDrone.Core.Music
 
         public Artist FindByName(string title)
         {
+            return ReleaseEvaluationContext.Read("artist.exact", title, () => FindByNameUncached(title));
+        }
+
+        private Artist FindByNameUncached(string title)
+        {
             return _artistRepository.FindByName(title.CleanArtistName());
         }
 
@@ -132,6 +138,11 @@ namespace NzbDrone.Core.Music
         }
 
         public Artist FindByNameInexact(string title)
+        {
+            return ReleaseEvaluationContext.Read("artist.fuzzy", title, () => FindByNameInexactUncached(title));
+        }
+
+        private Artist FindByNameInexactUncached(string title)
         {
             var artists = GetAllArtists();
 

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using FizzWare.NBuilder;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Test.Framework;
 
@@ -11,6 +13,20 @@ namespace NzbDrone.Core.Test.MusicTests.ArtistServiceTests
 
     public class FindByNameInexactFixture : CoreTest<ArtistService>
     {
+        [Test]
+        public void search_scope_caches_exact_misses_and_next_search_reloads()
+        {
+            using (new ReleaseEvaluationContext())
+            {
+                Subject.FindByName("Unknown Name").Should().BeNull();
+                Subject.FindByName("Unknown Name").Should().BeNull();
+            }
+
+            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Once());
+            Subject.FindByName("Unknown Name");
+            Mocker.GetMock<IArtistRepository>().Verify(x => x.FindByName("unknownname"), Times.Exactly(2));
+        }
+
         private List<Artist> _artists;
 
         private Artist CreateArtist(string name)

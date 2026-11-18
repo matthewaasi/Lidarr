@@ -73,6 +73,7 @@ namespace NzbDrone.Core.Datastore
     {
         private readonly Func<IDatabase, TParent, TChild> _query;
         private readonly Func<TParent, bool> _condition;
+        private readonly object _loadLock = new object();
 
         private IDatabase _database;
         private TParent _parent;
@@ -108,8 +109,13 @@ namespace NzbDrone.Core.Datastore
 
         public override void LazyLoad()
         {
-            if (!IsLoaded)
+            lock (_loadLock)
             {
+                if (IsLoaded)
+                {
+                    return;
+                }
+
                 if (_condition != null && _condition(_parent))
                 {
                     _value = _query(_database, _parent);

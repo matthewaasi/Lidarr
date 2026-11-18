@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NLog;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music.Events;
@@ -83,6 +84,11 @@ namespace NzbDrone.Core.Music
         }
 
         public List<Track> TracksWithoutFiles(int albumId)
+        {
+            return new List<Track>(ReleaseEvaluationContext.Read("tracks.missing", albumId, () => TracksWithoutFilesUncached(albumId)));
+        }
+
+        private List<Track> TracksWithoutFilesUncached(int albumId)
         {
             return _trackRepository.TracksWithoutFiles(albumId);
         }

@@ -4,6 +4,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Datastore;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Music.Events;
@@ -105,6 +106,11 @@ namespace NzbDrone.Core.Music
 
         public Album FindByTitleAndYear(int artistMetadataId, string title, int? year)
         {
+            return ReleaseEvaluationContext.Read("album.exact", (artistMetadataId, title, year), () => FindByTitleAndYearUncached(artistMetadataId, title, year));
+        }
+
+        private Album FindByTitleAndYearUncached(int artistMetadataId, string title, int? year)
+        {
             var album = _albumRepository.FindByTitle(artistMetadataId, title);
 
             if (album == null)
@@ -124,6 +130,11 @@ namespace NzbDrone.Core.Music
         }
 
         public Album FindByTitleAndYearInexact(int artistMetadataId, string title, int? year)
+        {
+            return ReleaseEvaluationContext.Read("album.fuzzy", (artistMetadataId, title, year), () => FindByTitleAndYearInexactUncached(artistMetadataId, title, year));
+        }
+
+        private Album FindByTitleAndYearInexactUncached(int artistMetadataId, string title, int? year)
         {
             var albums = GetAlbumsByArtistMetadataId(artistMetadataId);
 
@@ -301,6 +312,11 @@ namespace NzbDrone.Core.Music
         }
 
         public List<Album> GetAlbumsByArtistMetadataId(int artistMetadataId)
+        {
+            return new List<Album>(ReleaseEvaluationContext.Read("album.candidates", artistMetadataId, () => GetAlbumsByArtistMetadataIdUncached(artistMetadataId)));
+        }
+
+        private List<Album> GetAlbumsByArtistMetadataIdUncached(int artistMetadataId)
         {
             return _albumRepository.GetAlbumsByArtistMetadataId(artistMetadataId).ToList();
         }

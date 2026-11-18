@@ -10,6 +10,7 @@ using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
+using NzbDrone.Core.DecisionEngine.Specifications.Search;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser;
@@ -26,7 +27,8 @@ namespace NzbDrone.Core.DecisionEngine
 
     public class DownloadDecisionMaker : IMakeDownloadDecision
     {
-        private readonly IEnumerable<IDecisionEngineSpecification> _specifications;
+        private readonly IDecisionEngineSpecification[][] _specifications;
+        private readonly IDecisionEngineSpecification[][] _automaticSpecifications;
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IParsingService _parsingService;
         private readonly IRemoteAlbumAggregationService _aggregationService;
@@ -38,7 +40,9 @@ namespace NzbDrone.Core.DecisionEngine
             IRemoteAlbumAggregationService aggregationService,
             Logger logger)
         {
-            _specifications = specifications;
+            _specifications = specifications.GroupBy(x => x.Priority).OrderBy(x => x.Key).Select(x => x.ToArray()).ToArray();
+            _automaticSpecifications = _specifications.Select(group => group.OrderBy(spec =>
+                spec is QualityAllowedByProfileSpecification || spec is AlbumRequestedSpecification || spec is SingleAlbumSearchMatchSpecification ? 0 : 1).ToArray()).ToArray();
             _parsingService = parsingService;
             _formatCalculator = formatService;
             _aggregationService = aggregationService;
@@ -52,40 +56,79 @@ namespace NzbDrone.Core.DecisionEngine
 
         public List<DownloadDecision> GetSearchDecision(List<ReleaseInfo> reports, SearchCriteriaBase searchCriteriaBase)
         {
-            return GetAlbumDecisions(reports, false, searchCriteriaBase).ToList();
+            return GetSearchDecisionProgressive(reports, searchCriteriaBase, CancellationToken.None, (_, _) => Task.CompletedTask).GetAwaiter().GetResult();
         }
 
         public async Task<List<DownloadDecision>> GetSearchDecisionProgressive(List<ReleaseInfo> reports, SearchCriteriaBase criteria, CancellationToken cancellationToken, Func<int, List<DownloadDecision>, Task> progress)
         {
-            var decisions = new List<DownloadDecision>();
-            var batch = new List<DownloadDecision>();
-            var processed = 0;
-            var timer = Stopwatch.StartNew();
-            foreach (var decision in GetAlbumDecisions(reports, false, criteria, cancellationToken, count => processed = count))
+            using var context = new ReleaseEvaluationContext();
+            var totalTimer = Stopwatch.StartNew();
+            var decisions = new List<DownloadDecision>(reports.Count);
+            var workers = SearchWorkers();
+            var windowSize = workers;
+            _logger.ProgressInfo("Processing {0} releases with {1} workers", reports.Count, workers);
+
+            // Bounded windows keep memory, cancellation and progressive output predictable.
+            for (var offset = 0; offset < reports.Count;)
             {
-                decisions.Add(decision);
-                batch.Add(decision);
-                if (batch.Count >= 100 || timer.ElapsedMilliseconds >= 250)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await progress(processed, batch);
-                    batch = new List<DownloadDecision>();
-                    timer.Restart();
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var windowTimer = Stopwatch.StartNew();
+                var count = Math.Min(windowSize, reports.Count - offset);
+                var results = new DownloadDecision[count];
+                var windowStart = offset;
+                await Task.Run(
+                    () => Parallel.For(
+                        0,
+                        count,
+                        new ParallelOptions
+                        {
+                            CancellationToken = cancellationToken,
+                            MaxDegreeOfParallelism = workers
+                        },
+                        index =>
+                        {
+                            results[index] = GetAlbumDecisions(new List<ReleaseInfo> { reports[windowStart + index] }, false, criteria, cancellationToken, logSummary: false).SingleOrDefault();
+                        }),
+                    cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = results.Where(x => x != null).ToList();
+                decisions.AddRange(batch);
+                windowSize = Math.Clamp((int)(count * 250.0 / Math.Max(1, windowTimer.Elapsed.TotalMilliseconds)), workers, 100);
+                await progress(offset + count, batch);
+                offset += count;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await progress(processed, batch);
+            if (reports.Count == 0)
+            {
+                await progress(0, new List<DownloadDecision>());
+            }
+
+            _logger.Info(
+                "Release processing completed: {0} reports in {1:F3}s ({2:F1}/sec), {3} workers; {4}",
+                reports.Count,
+                totalTimer.Elapsed.TotalSeconds,
+                reports.Count / Math.Max(0.001, totalTimer.Elapsed.TotalSeconds),
+                workers,
+                context.Summary());
             return decisions;
         }
 
-        private IEnumerable<DownloadDecision> GetAlbumDecisions(List<ReleaseInfo> reports, bool pushedRelease = false, SearchCriteriaBase searchCriteria = null, CancellationToken cancellationToken = default, Action<int> processed = null)
+        private static int SearchWorkers()
         {
-            if (reports.Any())
+            return int.TryParse(Environment.GetEnvironmentVariable("LIDARR_RELEASE_WORKERS"), out var configured)
+                ? Math.Clamp(configured, 1, 16)
+                : Math.Clamp(Environment.ProcessorCount, 1, 4);
+        }
+
+        private IEnumerable<DownloadDecision> GetAlbumDecisions(List<ReleaseInfo> reports, bool pushedRelease = false, SearchCriteriaBase searchCriteria = null, CancellationToken cancellationToken = default, Action<int> processed = null, bool logSummary = true)
+        {
+            if (logSummary && reports.Any())
             {
                 _logger.ProgressInfo("Processing {0} releases", reports.Count);
             }
-            else
+            else if (logSummary)
             {
                 _logger.ProgressInfo("No results found");
             }
@@ -96,12 +139,16 @@ namespace NzbDrone.Core.DecisionEngine
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 DownloadDecision decision = null;
-                _logger.ProgressTrace("Processing release {0}/{1}", reportNumber, reports.Count);
+                if (logSummary)
+                {
+                    _logger.ProgressTrace("Processing release {0}/{1}", reportNumber, reports.Count);
+                }
+
                 _logger.Debug("Processing release '{0}' from '{1}'", report.Title, report.Indexer);
 
                 try
                 {
-                    var parsedAlbumInfo = Parser.Parser.ParseAlbumTitle(report.Title);
+                    var parsedAlbumInfo = ReleaseEvaluationContext.Measure("parse", () => Parser.Parser.ParseAlbumTitle(report.Title));
 
                     if (parsedAlbumInfo == null && searchCriteria != null)
                     {
@@ -112,7 +159,7 @@ namespace NzbDrone.Core.DecisionEngine
 
                     if (parsedAlbumInfo != null && !parsedAlbumInfo.ArtistName.IsNullOrWhiteSpace())
                     {
-                        var remoteAlbum = _parsingService.Map(parsedAlbumInfo, searchCriteria);
+                        var remoteAlbum = ReleaseEvaluationContext.Measure("map", () => _parsingService.Map(parsedAlbumInfo, searchCriteria));
                         remoteAlbum.Release = report;
 
                         _aggregationService.Augment(remoteAlbum);
@@ -156,7 +203,7 @@ namespace NzbDrone.Core.DecisionEngine
                         {
                             _aggregationService.Augment(remoteAlbum);
 
-                            remoteAlbum.CustomFormats = _formatCalculator.ParseCustomFormat(remoteAlbum, remoteAlbum.Release.Size);
+                            remoteAlbum.CustomFormats = ReleaseEvaluationContext.Measure("formats", () => _formatCalculator.ParseCustomFormat(remoteAlbum, remoteAlbum.Release.Size));
                             remoteAlbum.CustomFormatScore = remoteAlbum?.Artist?.QualityProfile?.Value.CalculateCustomFormatScore(remoteAlbum.CustomFormats) ?? 0;
 
                             remoteAlbum.DownloadAllowed = remoteAlbum.Albums.Any();
@@ -242,11 +289,24 @@ namespace NzbDrone.Core.DecisionEngine
         {
             var reasons = Array.Empty<Rejection>();
 
-            foreach (var specifications in _specifications.GroupBy(v => v.Priority).OrderBy(v => v.Key))
+            var groups = searchCriteria != null && !searchCriteria.InteractiveSearch ? _automaticSpecifications : _specifications;
+            foreach (var specifications in groups)
             {
-                reasons = specifications.Select(c => EvaluateSpec(c, remoteAlbum, searchCriteria))
-                                                        .Where(c => c != null)
-                                                        .ToArray();
+                var evaluated = new List<Rejection>();
+                foreach (var specification in specifications)
+                {
+                    var rejection = EvaluateSpec(specification, remoteAlbum, searchCriteria);
+                    if (rejection != null)
+                    {
+                        evaluated.Add(rejection);
+                        if (searchCriteria != null && !searchCriteria.InteractiveSearch && rejection.Type == RejectionType.Permanent)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                reasons = evaluated.ToArray();
 
                 if (reasons.Any())
                 {
@@ -261,7 +321,7 @@ namespace NzbDrone.Core.DecisionEngine
         {
             try
             {
-                var result = spec.IsSatisfiedBy(remoteAlbum, searchCriteriaBase);
+                var result = ReleaseEvaluationContext.Measure("rule." + spec.GetType().Name, () => spec.IsSatisfiedBy(remoteAlbum, searchCriteriaBase));
 
                 if (!result.Accepted)
                 {

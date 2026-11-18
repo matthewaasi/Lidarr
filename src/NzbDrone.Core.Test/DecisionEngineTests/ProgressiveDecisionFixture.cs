@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -47,7 +48,12 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public async Task fifteen_thousand_reports_keep_identical_decisions_and_order()
         {
-            var baseline = _service.GetSearchDecision(_reports, _criteria);
+            // Exercise the original serial evaluator without a search cache or worker pipeline.
+            var legacy = typeof(DownloadDecisionMaker).GetMethod("GetAlbumDecisions", BindingFlags.Instance | BindingFlags.NonPublic);
+            var baseline = ((IEnumerable<DownloadDecision>)legacy.Invoke(_service, new object[]
+            {
+                _reports, false, _criteria, CancellationToken.None, null, true
+            })).ToList();
             var streamed = new List<DownloadDecision>();
             var progressCounts = new List<int>();
             var result = await _service.GetSearchDecisionProgressive(_reports, _criteria, CancellationToken.None, (count, batch) =>
@@ -86,7 +92,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             Assert.ThrowsAsync<OperationCanceledException>(async () => await _service.GetSearchDecisionProgressive(_reports, _criteria, cancellation.Token, (_, _) => Task.CompletedTask));
-            _specification.VerifyNoOtherCalls();
+            _specification.Verify(x => x.IsSatisfiedBy(It.IsAny<RemoteAlbum>(), It.IsAny<SearchCriteriaBase>()), Times.Never());
         }
 
         [Test]
