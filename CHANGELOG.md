@@ -2,6 +2,16 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.18 — Batched logging and indexed matching
+
+- Batch debug/trace file writes through bounded asynchronous queues while retaining cleansing, rotation and graceful flushing. Info logging stays synchronous.
+- Read and index the artist catalog once per search; index exact album lookup by artist. Preserve matching thresholds, candidate coverage, ambiguity and year rules.
+- Cache normalized artist aliases and reuse criteria regexes within each search. Find unique fuzzy matches without sorting the entire artist catalog.
+- Emit periodic and stopped-search throughput/stage summaries, rather than logging timings only on completion.
+- Compare production parsing on 5,168 privately captured titles and original/indexed artist scoring on 2,419 captured strings plus fixture examples. The library catalog in the replay is synthetic; production accuracy and 500 releases/sec remain deployment validation targets.
+
+See [ai.18 release notes](docs/releases/ai.18.md) and [performance details](docs/SEARCH-PERFORMANCE.md).
+
 ## 3.2.1.5196-ai.17 — Faster release evaluation
 
 - Cache exact/fuzzy artist and album matches, candidate albums, album files, missing tracks and history within each search, including unsuccessful matches.

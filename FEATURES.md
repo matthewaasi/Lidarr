@@ -1,4 +1,6 @@
-# Features — 3.2.1.5196-ai.17
+# Features — 3.2.1.5196-ai.18
+
+- Batched debug/trace file logging, indexed catalog matching, reused search-criteria regexes and periodic timing summaries, including stopped searches.
 
 - Search-scoped matching and album-state caches, bounded workers, stable ordered progress, full interactive rejection details, and processing throughput/stage timings.
 - Live Library Audit phase percentages and counters; running task cancellation and named search progress remain available.
