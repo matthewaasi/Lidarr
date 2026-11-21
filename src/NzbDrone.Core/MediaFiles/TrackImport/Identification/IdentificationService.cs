@@ -200,7 +200,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
             localAlbumRelease.AiMatch = null;
             localAlbumRelease.LocalTracks.ForEach(t => t.AiMatch = null);
             var fingerprinted = false;
-            var hybrid = _configService.MatchingEngine == "Hybrid";
+            var matchingEngine = config.GetMatchingEngine(_configService);
+            var hybrid = matchingEngine == "Hybrid";
 
             var candidateReleases = _candidateService.GetDbCandidatesFromTags(localAlbumRelease, idOverrides, config.IncludeExisting);
 
@@ -225,7 +226,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             if (candidateReleases.Count == 0)
             {
-                if (_configService.MatchingEngine != "Original" && !(hybrid && config.UseCachedIdentificationOnly))
+                if (matchingEngine != "Original" && !(hybrid && config.UseCachedIdentificationOnly))
                 {
                     _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, new List<LocalTrack>());
                 }
@@ -254,7 +255,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             _logger.Debug($"Retrieved {allLocalTracks.Count} possible tracks in {watch.ElapsedMilliseconds}ms");
 
-            if (_configService.MatchingEngine != "Original" && !hybrid)
+            if (matchingEngine != "Original" && !hybrid)
             {
                 _lmStudioMatcher.Identify(localAlbumRelease, candidateReleases, allLocalTracks);
                 return;

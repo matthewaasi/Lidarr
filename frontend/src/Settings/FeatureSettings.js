@@ -101,7 +101,7 @@ class FeatureSettings extends Component {
                 ) : (
                   <>
                     <label className={styles.field}>
-                      <span>Matching engine</span>
+                      <span>Automatic identification method</span>
                       <select name="matchingEngine" value={data.matchingEngine}
                         disabled={busy} onChange={this.onChange}
                       >
@@ -110,14 +110,25 @@ class FeatureSettings extends Component {
                         <option value="Hybrid">Lidarr first, LM Studio fallback</option>
                       </select>
                     </label>
+                    <label className={styles.field}>
+                      <span>Manual identification method</span>
+                      <select name="manualMatchingEngine" value={data.manualMatchingEngine || 'Inherit'}
+                        disabled={busy} onChange={this.onChange}
+                      >
+                        <option value="Inherit">Same as automatic</option>
+                        <option value="Original">Original Lidarr</option>
+                        <option value="LmStudio">LM Studio</option>
+                        <option value="Hybrid">Lidarr first, LM Studio fallback</option>
+                      </select>
+                    </label>
                     <p>Engine changes apply to future identification and explicit retries. Saved AI proposals keep their original model label. Original Lidarr does not contact LM Studio. Hybrid tries native matching first using the thresholds below (80% album by default), then sends the whole release to LM Studio only if identification or completeness checks fail. Other import rejections do not trigger AI.</p>
-                    <p>Manual import preview in Hybrid mode tries native matching and reuses saved AI results without calling LM Studio. Map Tracks and Retry Matching run fresh native-first matching. AI fallback uses the Review or Automatic setting below; native matches are not held by AI Review mode.</p>
+                    <p>Opening Manual Import can show saved AI results. Map Tracks runs fresh matching with the manual method. Retry Matching uses the automatic method. AI fallback uses the Review or Automatic setting below; native matches are not held by AI Review mode.</p>
                     <h3>Native Lidarr thresholds (Original and Hybrid)</h3>
                     {this.field('originalAlbumMatchPercent', 'Minimum album match score (%)', { type: 'number', min: 1, max: 100, required: true }, 'Default 80%. A weighted metadata similarity score, not an AI probability.')}
                     {this.field('originalTrackMatchPercent', 'Minimum track match score (%)', { type: 'number', min: 1, max: 100, required: true }, 'Default 60%, matching stock Lidarr. Missing-track protection applies with either engine.')}
                     <h3>LM Studio</h3>
-                    {this.field('lmStudioBaseUrl', 'Server API URL', { type: 'url', required: data.matchingEngine !== 'Original' }, 'Include /v1, for example http://10.0.0.88:1234/v1.')}
-                    {this.field('lmStudioModel', 'Model identifier', { required: data.matchingEngine !== 'Original' }, 'Use the exact model ID shown by LM Studio.')}
+                    {this.field('lmStudioBaseUrl', 'Server API URL', { type: 'url', required: data.matchingEngine !== 'Original' || ['LmStudio', 'Hybrid'].includes(data.manualMatchingEngine) }, 'Include /v1, for example http://10.0.0.88:1234/v1.')}
+                    {this.field('lmStudioModel', 'Model identifier', { required: data.matchingEngine !== 'Original' || ['LmStudio', 'Hybrid'].includes(data.manualMatchingEngine) }, 'Use the exact model ID shown by LM Studio.')}
                     <label className={styles.field}>
                       <span>LM Studio import mode</span>
                       <select name="lmStudioMode" value={data.lmStudioMode}

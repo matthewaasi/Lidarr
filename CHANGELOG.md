@@ -2,6 +2,12 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.20
+
+- Add separate Automatic identification method and Manual identification method settings.
+- Manual Import defaults to Same as automatic. Its preview never sends a fresh request to LM Studio.
+- Map Tracks uses the manual method. Retry Matching uses the automatic method.
+
 ## 3.2.1.5196-ai.19 — Album-wide AI reconciliation
 
 - File batches that select different editions or leave release identity uncertain trigger one album-wide AI selection using all original files and candidates.

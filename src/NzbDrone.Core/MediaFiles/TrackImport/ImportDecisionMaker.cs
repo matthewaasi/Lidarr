@@ -43,6 +43,13 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
         public bool IncludeExisting { get; set; }
         public bool AddNewArtists { get; set; }
         public bool UseCachedIdentificationOnly { get; set; }
+        public bool IsManualImport { get; set; }
+
+        public string GetMatchingEngine(IConfigService configService)
+        {
+            var manualEngine = IsManualImport ? configService.ManualMatchingEngine : null;
+            return manualEngine is "Original" or "LmStudio" or "Hybrid" ? manualEngine : configService.MatchingEngine;
+        }
     }
 
     public class ImportDecisionMaker : IMakeImportDecision
@@ -158,7 +165,8 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             localTracks.ForEach(x => x.ExistingFile = !config.NewDownload);
 
-            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine != "Original" && _configService.MatchingEngine != "Hybrid")
+            var matchingEngine = config.GetMatchingEngine(_configService);
+            if (config.UseCachedIdentificationOnly && matchingEngine != "Original" && matchingEngine != "Hybrid")
             {
                 decisions.AddRange(_aiDecisionCache.Read(localTracks));
                 return decisions;
@@ -166,7 +174,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport
 
             var releases = _identificationService.Identify(localTracks, idOverrides, config);
 
-            if (config.UseCachedIdentificationOnly && _configService.MatchingEngine == "Hybrid")
+            if (config.UseCachedIdentificationOnly && matchingEngine == "Hybrid")
             {
                 var unresolved = releases.Where(r => !NativeMatchPolicy.IsAccepted(r, config.NewDownload, _configService, _logger)).ToList();
                 foreach (var release in unresolved)

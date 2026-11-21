@@ -12,6 +12,7 @@ namespace Lidarr.Api.V1.Config
     public class IdentificationConfigResource : RestResource
     {
         public string MatchingEngine { get; set; }
+        public string ManualMatchingEngine { get; set; }
         public int OriginalAlbumMatchPercent { get; set; }
         public int OriginalTrackMatchPercent { get; set; }
         public string LmStudioBaseUrl { get; set; }
@@ -27,14 +28,15 @@ namespace Lidarr.Api.V1.Config
             : base(config)
         {
             SharedValidator.RuleFor(x => x.MatchingEngine).Must(x => x == "Original" || x == "LmStudio" || x == "Hybrid");
+            SharedValidator.RuleFor(x => x.ManualMatchingEngine).Must(x => x is null or "Inherit" or "Original" or "LmStudio" or "Hybrid");
             SharedValidator.RuleFor(x => x.OriginalAlbumMatchPercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.OriginalTrackMatchPercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.LmStudioConfidencePercent).InclusiveBetween(1, 100);
             SharedValidator.RuleFor(x => x.LmStudioMode).Must(x => x == "Review" || x == "Automatic");
             SharedValidator.RuleFor(x => x.LmStudioBaseUrl).Must(x => Uri.TryCreate(x, UriKind.Absolute, out var uri) &&
                 (uri.Scheme == "http" || uri.Scheme == "https") && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment))
-                .When(x => x.MatchingEngine == "LmStudio" || x.MatchingEngine == "Hybrid");
-            SharedValidator.RuleFor(x => x.LmStudioModel).NotEmpty().When(x => x.MatchingEngine == "LmStudio" || x.MatchingEngine == "Hybrid");
+                .When(x => x.MatchingEngine != "Original" || (x.ManualMatchingEngine ?? config.ManualMatchingEngine) is "LmStudio" or "Hybrid");
+            SharedValidator.RuleFor(x => x.LmStudioModel).NotEmpty().When(x => x.MatchingEngine != "Original" || (x.ManualMatchingEngine ?? config.ManualMatchingEngine) is "LmStudio" or "Hybrid");
         }
 
         protected override IdentificationConfigResource ToResource(IConfigService model)
@@ -43,6 +45,7 @@ namespace Lidarr.Api.V1.Config
             return new IdentificationConfigResource
             {
                 MatchingEngine = model.MatchingEngine,
+                ManualMatchingEngine = model.ManualMatchingEngine,
                 OriginalAlbumMatchPercent = model.OriginalAlbumMatchPercent,
                 OriginalTrackMatchPercent = model.OriginalTrackMatchPercent,
                 LmStudioBaseUrl = string.IsNullOrWhiteSpace(model.LmStudioBaseUrl) ? Environment.GetEnvironmentVariable("LIDARR_AI_BASE_URL") ?? "http://10.0.0.88:1234/v1" : model.LmStudioBaseUrl,

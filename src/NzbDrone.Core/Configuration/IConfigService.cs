@@ -13,6 +13,7 @@ namespace NzbDrone.Core.Configuration
         bool IsDefined(string key);
 
         string MatchingEngine { get; set; }
+        string ManualMatchingEngine { get; set; }
         int OriginalAlbumMatchPercent { get; set; }
         int OriginalTrackMatchPercent { get; set; }
         string LmStudioBaseUrl { get; set; }

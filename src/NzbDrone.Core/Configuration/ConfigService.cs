@@ -90,6 +90,12 @@ namespace NzbDrone.Core.Configuration
             set => SetValue("MatchingEngine", value);
         }
 
+        public string ManualMatchingEngine
+        {
+            get => GetValue("ManualMatchingEngine", "Inherit");
+            set => SetValue("ManualMatchingEngine", value);
+        }
+
         public int OriginalAlbumMatchPercent
         {
             get => GetValueInt("OriginalAlbumMatchPercent", 80);

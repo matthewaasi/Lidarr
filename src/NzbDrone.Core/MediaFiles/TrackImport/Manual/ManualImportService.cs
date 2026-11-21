@@ -116,6 +116,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
 
                 var config = new ImportDecisionMakerConfig
                 {
+                    IsManualImport = true,
                     Filter = FilterFilesType.None,
                     NewDownload = true,
                     SingleRelease = false,
@@ -188,6 +189,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
             };
             var config = new ImportDecisionMakerConfig
             {
+                IsManualImport = true,
                 Filter = filter,
                 NewDownload = true,
                 SingleRelease = false,
@@ -252,6 +254,7 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Manual
                 };
                 var config = new ImportDecisionMakerConfig
                 {
+                    IsManualImport = true,
                     Filter = FilterFilesType.None,
                     NewDownload = true,
                     SingleRelease = true,

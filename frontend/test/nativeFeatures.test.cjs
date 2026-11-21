@@ -167,19 +167,21 @@ test('review pagination and filters are sent to the server and requests abort on
 });
 
 
-test('hybrid matching can be selected and saved with required AI configuration', async () => {
+test('automatic and manual engines can be saved independently with required AI configuration', async () => {
   const { instance, calls } = harness('Settings/FeatureSettings.js', { feature: 'identification' });
   instance.componentDidMount();
   calls[0].resolve({ matchingEngine: 'Original', originalAlbumMatchPercent: 80, originalTrackMatchPercent: 60, lmStudioBaseUrl: 'http://localhost:1234/v1', lmStudioModel: 'model', lmStudioMode: 'Review', lmStudioConfidencePercent: 95 });
   await settle();
   instance.onChange({ target: { name: 'matchingEngine', value: 'Hybrid', type: 'select-one' } });
+  instance.onChange({ target: { name: 'manualMatchingEngine', value: 'Original', type: 'select-one' } });
   const tree = instance.render();
-  assert.equal(nodes(tree, (n) => n.type === 'option' && n.props.value === 'Hybrid').length, 1);
+  assert.equal(nodes(tree, (n) => n.type === 'select' && n.props.name === 'manualMatchingEngine')[0].props.value, 'Original');
   assert.equal(nodes(tree, (n) => n.type === 'input' && n.props.name === 'lmStudioModel')[0].props.required, true);
   assert.match(text(tree), /80% album by default/);
   instance.onSave({ preventDefault() {} });
   const body = JSON.parse(calls[1].options.data);
   assert.equal(body.matchingEngine, 'Hybrid');
+  assert.equal(body.manualMatchingEngine, 'Original');
   assert.equal(body.originalAlbumMatchPercent, 80);
   assert.equal(body.lmStudioMode, 'Review');
   calls[1].resolve({});

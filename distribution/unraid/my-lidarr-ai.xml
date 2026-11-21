@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>lidarr-ai</Name>
-  <Repository>lidarr-ai:3.2.1.5196-ai.19</Repository>
+  <Repository>lidarr-ai:3.2.1.5196-ai.20</Repository>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <WebUI>http://[IP]:[PORT:8686]/</WebUI>
-  <Overview>Lidarr fork with Library Audit, faster library and artist pages, and native/LM Studio matching. Load the ai.19 Docker archive first. Preserve existing paths and PostgreSQL settings when upgrading.</Overview>
+  <Overview>Lidarr fork with Library Audit, faster library and artist pages, and native/LM Studio matching. Load the ai.20 Docker archive first. Preserve existing paths and PostgreSQL settings when upgrading.</Overview>
   <Config Name="Web UI" Target="8686" Default="8687" Mode="tcp" Description="Lidarr web interface" Type="Port" Display="always" Required="true" Mask="false">8687</Config>
   <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/lidarr-ai" Mode="rw" Description="Copied Lidarr appdata including plugins" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/lidarr-ai</Config>
   <Config Name="Music" Target="/music" Default="/mnt/user/music" Mode="rw" Description="Match your existing container mapping" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/music</Config>
