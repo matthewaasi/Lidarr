@@ -1133,6 +1133,7 @@
   "RetryAi": "Retry Matching",
   "RetryAiHelpText": "Retry identification using the engine selected in Settings for all completed downloads awaiting import, including items hidden by the current filter",
   "RetryAiFailed": "Could not queue the matching retry. Please try again.",
+  "RetryAutomaticImport": "Retry Automatic Import",
   "SavedAiMatchingResult": "Saved AI result — no new matching request",
   "SearchMonitoredReleaseType": "Search {count} monitored releases in {releaseType}",
   "SearchingMonitoredReleaseType": "Searching monitored releases in {releaseType}",

@@ -17,10 +17,12 @@ function createMapStateToProps() {
   return createSelector(
     createClientSideCollectionSelector('trackFiles'),
     createCommandExecutingSelector(commandNames.RESCAN_FOLDERS),
+    createCommandExecutingSelector(commandNames.RESCAN_FOLDERS, { filter: 'matched', addNewArtists: false }),
     createDimensionsSelector(),
     (
       trackFiles,
       isScanningFolders,
+      isRetryingAutomaticImport,
       dimensionsState
     ) => {
       // trackFiles could pick up mapped entries via signalR so filter again here
@@ -35,6 +37,7 @@ function createMapStateToProps() {
         items: unmappedFiles,
         ...otherProps,
         isScanningFolders,
+        isRetryingAutomaticImport,
         isSmallScreen: dimensionsState.isSmallScreen
       };
     }
@@ -61,6 +64,14 @@ function createMapDispatchToProps(dispatch, props) {
 
     deleteUnmappedFiles(trackFileIds) {
       dispatch(deleteTrackFiles({ trackFileIds }));
+    },
+
+    onRetryAutomaticImportPress() {
+      dispatch(executeCommand({
+        name: commandNames.RESCAN_FOLDERS,
+        filter: 'matched',
+        addNewArtists: false
+      }));
     },
 
     onAddMissingArtistsPress() {

@@ -2,6 +2,10 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.21
+
+- Add Retry Automatic Import to the Unmapped Files toolbar to rerun matching against artists already in the library.
+
 ## 3.2.1.5196-ai.20
 
 - Add separate Automatic identification method and Manual identification method settings.

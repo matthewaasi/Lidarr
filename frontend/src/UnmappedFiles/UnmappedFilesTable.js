@@ -172,6 +172,8 @@ class UnmappedFilesTable extends Component {
       onTableOptionChange,
       onSortPress,
       isScanningFolders,
+      isRetryingAutomaticImport,
+      onRetryAutomaticImportPress,
       onAddMissingArtistsPress,
       deleteUnmappedFiles,
       ...otherProps
@@ -190,10 +192,17 @@ class UnmappedFilesTable extends Component {
         <PageToolbar>
           <PageToolbarSection>
             <PageToolbarButton
+              label={translate('RetryAutomaticImport')}
+              iconName={icons.REFRESH}
+              isDisabled={isFetching || !!error || !items.length || isScanningFolders}
+              isSpinning={isRetryingAutomaticImport}
+              onPress={onRetryAutomaticImportPress}
+            />
+            <PageToolbarButton
               label={translate('AddMissing')}
               iconName={icons.ADD_MISSING_ARTISTS}
-              isDisabled={isPopulated && !error && !items.length}
-              isSpinning={isScanningFolders}
+              isDisabled={isRetryingAutomaticImport || (isPopulated && !error && !items.length)}
+              isSpinning={isScanningFolders && !isRetryingAutomaticImport}
               onPress={onAddMissingArtistsPress}
             />
             <PageToolbarButton
@@ -284,6 +293,8 @@ UnmappedFilesTable.propTypes = {
   deleteUnmappedFile: PropTypes.func.isRequired,
   deleteUnmappedFiles: PropTypes.func.isRequired,
   isScanningFolders: PropTypes.bool.isRequired,
+  isRetryingAutomaticImport: PropTypes.bool.isRequired,
+  onRetryAutomaticImportPress: PropTypes.func.isRequired,
   onAddMissingArtistsPress: PropTypes.func.isRequired
 };
 

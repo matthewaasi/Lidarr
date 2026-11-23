@@ -1,6 +1,6 @@
 # Lidarr AI Fork
 
-**Current version: 3.2.1.5196-ai.20** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
+**Current version: 3.2.1.5196-ai.21** · Linux amd64 · Based on upstream [Lidarr v3.2.1.5196](https://github.com/Lidarr/Lidarr/tree/v3.2.1.5196).
 
 Album-wide AI reconciliation resolves conflicting file-stage release choices before remapping tracks. Unmatched extra files no longer erase an otherwise identified release. Prior search-performance improvements remain included. This fork adds optional AI identification and the features listed below while retaining upstream licensing.
 
@@ -34,7 +34,7 @@ Album-wide AI reconciliation resolves conflicting file-stage release choices bef
 
 ## Download and install
 
-The ai.20 build package contains a Docker-loadable archive, matching source, installation notes, checksums and verification records. Load the archive with `docker load -i <archive>` and use image tag `lidarr-ai:3.2.1.5196-ai.20`. See [ai.20 notes](docs/releases/ai.20.md). Preserve your existing appdata, media paths and database settings. These are downloadable Docker archives; no container registry image is implied.
+Load the ai.21 Docker archive with `docker load -i lidarr-ai-3.2.1.5196-ai.21-amd64.tar.gz` and use image tag `lidarr-ai:3.2.1.5196-ai.21`. Preserve your existing appdata, media paths and database settings. See the [ai.21 release notes](docs/releases/ai.21.md).
 
 - Linux amd64 image, based on upstream Lidarr v3.2.1.5196 and the pinned LinuxServer nightly runtime. Assembly version remains 3.2.1.5196 for plugin compatibility.
 - Preserve /config, media mappings, ports, network and database configuration when replacing the container.
@@ -49,6 +49,7 @@ GitHub publication tags use `ai.01`–`ai.09` so releases sort correctly. Docker
 
 | Release | Main changes | Details |
 | --- | --- | --- |
+| [ai.21](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.21) | Retry Automatic Import from Unmapped Files | [Release notes](docs/releases/ai.21.md) |
 | [ai.20](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.20) | Separate automatic and manual identification methods | [Release notes](docs/releases/ai.20.md) |
 | [ai.19](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.19) | Album-wide AI release reconciliation and constrained remapping | [Changelog and features](docs/releases/ai.19.md) |
 | [ai.18](https://github.com/matthewaasi/Lidarr/releases/tag/v3.2.1.5196-ai.18) | Batched logging, indexed matching and periodic search timings | [Changelog and features](docs/releases/ai.18.md) |
