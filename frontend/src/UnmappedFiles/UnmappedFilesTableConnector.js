@@ -66,11 +66,12 @@ function createMapDispatchToProps(dispatch, props) {
       dispatch(deleteTrackFiles({ trackFileIds }));
     },
 
-    onRetryAutomaticImportPress() {
+    onRetryAutomaticImportPress(trackFileIds) {
       dispatch(executeCommand({
         name: commandNames.RESCAN_FOLDERS,
         filter: 'matched',
-        addNewArtists: false
+        addNewArtists: false,
+        trackFileIds
       }));
     },
 

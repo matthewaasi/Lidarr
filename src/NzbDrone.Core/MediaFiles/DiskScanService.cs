@@ -307,7 +307,39 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Execute(RescanFoldersCommand message)
         {
+            if (message.TrackFileIds?.Count > 0)
+            {
+                RetrySelectedUnmappedFiles(message.TrackFileIds);
+                return;
+            }
+
             Scan(message.Folders, message.Filter, message.AddNewArtists, message.ArtistIds);
+        }
+
+        private void RetrySelectedUnmappedFiles(List<int> trackFileIds)
+        {
+            var files = _mediaFileService.Get(trackFileIds.Distinct())
+                .Where(file => file.AlbumId == 0 && _rootFolderService.GetBestRootFolder(file.Path) != null)
+                .Where(file => _diskProvider.FileExists(file.Path))
+                .Select(file => _diskProvider.GetFileInfo(file.Path))
+                .ToList();
+
+            if (files.Count == 0)
+            {
+                return;
+            }
+
+            _logger.ProgressInfo("Retrying automatic import for {0} selected files", files.Count);
+
+            var config = new ImportDecisionMakerConfig
+            {
+                Filter = FilterFilesType.None,
+                IncludeExisting = true,
+                AddNewArtists = false
+            };
+
+            var decisions = _importDecisionMaker.GetImportDecisions(files, null, null, config);
+            _importApprovedTracks.Import(decisions, false);
         }
     }
 }

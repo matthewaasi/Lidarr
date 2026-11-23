@@ -24,6 +24,7 @@ namespace NzbDrone.Core.MediaFiles.Commands
         public FilterFilesType Filter { get; set; }
         public bool AddNewArtists { get; set; }
         public List<int> ArtistIds { get; set; }
+        public List<int> TrackFileIds { get; set; }
 
         public override bool SendUpdatesToClient => true;
         public override bool RequiresDiskAccess => true;

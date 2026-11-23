@@ -128,6 +128,10 @@ class UnmappedFilesTable extends Component {
     this.props.deleteUnmappedFiles(selectedIds);
   };
 
+  onRetryAutomaticImportPress = () => {
+    this.props.onRetryAutomaticImportPress(this.getSelectedIds());
+  };
+
   rowRenderer = ({ key, rowIndex, style }) => {
     const {
       items,
@@ -173,7 +177,6 @@ class UnmappedFilesTable extends Component {
       onSortPress,
       isScanningFolders,
       isRetryingAutomaticImport,
-      onRetryAutomaticImportPress,
       onAddMissingArtistsPress,
       deleteUnmappedFiles,
       ...otherProps
@@ -196,7 +199,7 @@ class UnmappedFilesTable extends Component {
               iconName={icons.REFRESH}
               isDisabled={isFetching || !!error || !items.length || isScanningFolders}
               isSpinning={isRetryingAutomaticImport}
-              onPress={onRetryAutomaticImportPress}
+              onPress={this.onRetryAutomaticImportPress}
             />
             <PageToolbarButton
               label={translate('AddMissing')}
