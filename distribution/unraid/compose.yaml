@@ -1,6 +1,6 @@
 services:
   lidarr-ai:
-    image: lidarr-ai:3.2.1.5196-ai.21
+    image: lidarr-ai:3.2.1.5196-ai.22
     pull_policy: never
     container_name: lidarr-ai
     environment:

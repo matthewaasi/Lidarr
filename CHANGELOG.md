@@ -2,6 +2,10 @@
 
 Cumulative release history relative to upstream Lidarr v3.2.1.5196. Each entry lists changes introduced in that version.
 
+## 3.2.1.5196-ai.22
+
+- Retry Automatic Import processes only checked rows when files are selected. With no selection, it retries all unmapped files.
+
 ## 3.2.1.5196-ai.21
 
 - Add Retry Automatic Import to the Unmapped Files toolbar to rerun matching against artists already in the library.
