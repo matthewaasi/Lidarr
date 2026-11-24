@@ -18,7 +18,7 @@ RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net8
     -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=3.2.1.5196 -p:AssemblyConfiguration=nightly-ai -o /out
 
 FROM ghcr.io/linuxserver/lidarr:nightly-3.2.1.5196-ls224@sha256:d1e3b469e618fa54b56bc487442efc231142096db3188cd3a4d5b1393b919e5e
-ARG FORK_VERSION=3.2.1.5196-ai.23
+ARG FORK_VERSION=3.2.1.5196-ai.24
 ARG VCS_REF=unknown
 RUN cp /app/lidarr/bin/fpcalc /tmp/lidarr-fpcalc \
     && rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin \
@@ -27,7 +27,7 @@ COPY --from=backend /out/ /app/lidarr/bin/
 COPY --from=frontend /src/_output/UI/ /app/lidarr/bin/UI/
 COPY LICENSE.md /app/lidarr/bin/LICENSE.md
 COPY LICENSES/ /app/lidarr/bin/LICENSES/
-RUN chmod 755 /app/lidarr/bin/Lidarr \
+RUN chmod 755 /app/lidarr/bin/Lidarr /app/lidarr/bin/fpcalc \
     && printf 'UpdateMethod=docker\nBranch=nightly\nPackageVersion=%s\nPackageAuthor=Lidarr AI local fork\n' "$FORK_VERSION" > /app/lidarr/package_info
 ENV LIDARR_AI_MODE=Review \
     LIDARR_AI_BASE_URL=http://10.0.0.88:1234/v1 \

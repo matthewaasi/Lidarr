@@ -2,11 +2,7 @@ name: Lidarr Docker release
 
 on:
   push:
-    branches: ['release/ai.23']
-
-concurrency:
-  group: lidarr-ai.23-release
-  cancel-in-progress: true
+    branches: ['release/ai.24']
 
 permissions:
   contents: write
@@ -16,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERSION: 3.2.1.5196-ai.23
+      VERSION: 3.2.1.5196-ai.24
     steps:
       - uses: actions/checkout@v4
       - name: Build and smoke-test the Linux amd64 image
@@ -29,6 +25,7 @@ jobs:
           trap 'docker rm -f lidarr-smoke >/dev/null' EXIT
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:8686/ping; then
+              docker exec --user abc --workdir /app/lidarr/bin lidarr-smoke /app/lidarr/bin/fpcalc -version
               exit 0
             fi
             sleep 2
@@ -43,4 +40,4 @@ jobs:
           docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
           gh release create "v$VERSION" "$archive" \
             --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
-            --notes-file docs/releases/ai.23.md
+            --notes-file docs/releases/ai.24.md
