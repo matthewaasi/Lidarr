@@ -4,6 +4,10 @@ on:
   push:
     branches: ['release/ai.23']
 
+concurrency:
+  group: lidarr-ai.23-release
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -21,7 +25,16 @@ jobs:
             --build-arg FORK_VERSION="$VERSION" \
             --build-arg VCS_REF="$GITHUB_SHA" \
             --tag "lidarr-ai:$VERSION" .
-          docker run --rm --entrypoint /app/lidarr/bin/Lidarr "lidarr-ai:$VERSION" --version
+          docker run -d --name lidarr-smoke -p 127.0.0.1:8686:8686 "lidarr-ai:$VERSION"
+          trap 'docker rm -f lidarr-smoke >/dev/null' EXIT
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8686/ping; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs lidarr-smoke
+          exit 1
       - name: Package and publish the image
         env:
           GH_TOKEN: ${{ github.token }}
