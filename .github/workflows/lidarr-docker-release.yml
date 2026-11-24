@@ -1,0 +1,33 @@
+name: Lidarr Docker release
+
+on:
+  push:
+    branches: ['release/ai.23']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VERSION: 3.2.1.5196-ai.23
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and smoke-test the Linux amd64 image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg FORK_VERSION="$VERSION" \
+            --build-arg VCS_REF="$GITHUB_SHA" \
+            --tag "lidarr-ai:$VERSION" .
+          docker run --rm --entrypoint /app/lidarr/bin/Lidarr "lidarr-ai:$VERSION" --version
+      - name: Package and publish the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="lidarr-ai-$VERSION-amd64.tar.gz"
+          docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
+          gh release create "v$VERSION" "$archive" \
+            --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
+            --notes-file docs/releases/ai.23.md

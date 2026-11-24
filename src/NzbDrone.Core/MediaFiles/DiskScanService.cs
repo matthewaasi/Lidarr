@@ -307,29 +307,46 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Execute(RescanFoldersCommand message)
         {
-            if (message.TrackFileIds?.Count > 0)
+            if (message.TrackFileIds != null)
             {
-                RetrySelectedUnmappedFiles(message.TrackFileIds);
+                RetryUnmappedFiles(message.TrackFileIds);
                 return;
             }
 
             Scan(message.Folders, message.Filter, message.AddNewArtists, message.ArtistIds);
         }
 
-        private void RetrySelectedUnmappedFiles(List<int> trackFileIds)
+        private void RetryUnmappedFiles(List<int> trackFileIds)
         {
-            var files = _mediaFileService.Get(trackFileIds.Distinct())
-                .Where(file => file.AlbumId == 0 && _rootFolderService.GetBestRootFolder(file.Path) != null)
-                .Where(file => _diskProvider.FileExists(file.Path))
-                .Select(file => _diskProvider.GetFileInfo(file.Path))
+            var selectedIds = trackFileIds.ToHashSet();
+            var unmappedFiles = _mediaFileService.GetUnmappedFiles()
+                .Where(file => selectedIds.Count == 0 || selectedIds.Contains(file.Id))
                 .ToList();
+
+            var files = new List<IFileInfo>();
+            foreach (var file in unmappedFiles)
+            {
+                if (_rootFolderService.GetBestRootFolder(file.Path) == null)
+                {
+                    _logger.Debug("Skipping automatic import for {0}: outside configured root folders", file.Path);
+                }
+                else if (!_diskProvider.FileExists(file.Path))
+                {
+                    _logger.Debug("Skipping automatic import for {0}: file is missing", file.Path);
+                }
+                else
+                {
+                    files.Add(_diskProvider.GetFileInfo(file.Path));
+                }
+            }
 
             if (files.Count == 0)
             {
+                _logger.ProgressInfo("Automatic import: no eligible unmapped files found");
                 return;
             }
 
-            _logger.ProgressInfo("Retrying automatic import for {0} selected files", files.Count);
+            _logger.ProgressInfo("Retrying automatic import for {0} unmapped files", files.Count);
 
             var config = new ImportDecisionMakerConfig
             {
@@ -339,7 +356,20 @@ namespace NzbDrone.Core.MediaFiles
             };
 
             var decisions = _importDecisionMaker.GetImportDecisions(files, null, null, config);
-            _importApprovedTracks.Import(decisions, false);
+            var results = _importApprovedTracks.Import(decisions, false);
+
+            foreach (var result in results.Where(result => result.Errors.Count > 0))
+            {
+                _logger.Debug("Automatic import left {0} unmapped: {1}",
+                    result.ImportDecision.Item.Path,
+                    string.Join("; ", result.Errors));
+            }
+
+            var imported = results.Count(result => result.Result == ImportResultType.Imported);
+            _logger.ProgressInfo("Automatic import: imported {0} of {1} eligible files ({2} unavailable)",
+                imported,
+                files.Count,
+                unmappedFiles.Count - files.Count);
         }
     }
 }
