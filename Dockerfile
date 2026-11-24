@@ -3,6 +3,7 @@ FROM node:22-bookworm-slim AS frontend
 WORKDIR /src
 COPY package.json yarn.lock ./
 RUN npm install --global --force yarn@1.22.22 && yarn install --frozen-lockfile --network-timeout 120000
+COPY tsconfig.json ./
 COPY frontend/ frontend/
 RUN node node_modules/webpack/bin/webpack.js --config frontend/build/webpack.config.js --env production
 
