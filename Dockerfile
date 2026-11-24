@@ -8,7 +8,7 @@ RUN node node_modules/webpack/bin/webpack.js --config frontend/build/webpack.con
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0.421 AS backend
 WORKDIR /src
-COPY global.json ./
+COPY global.json .editorconfig ./
 COPY src/ src/
 COPY Logo/ Logo/
 RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net8.0 -r linux-musl-x64 --self-contained true \
