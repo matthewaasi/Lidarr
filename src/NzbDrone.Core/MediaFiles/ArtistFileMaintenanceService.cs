@@ -17,9 +17,9 @@ namespace NzbDrone.Core.MediaFiles
     public class ArtistFilePreview
     {
         public string Key { get; set; }
-        public List<RenameTrackFilePreview> Renames { get; set; } = new ();
-        public List<RetagTrackFilePreview> Retags { get; set; } = new ();
-        public List<string> Skipped { get; set; } = new ();
+        public List<RenameTrackFilePreview> Renames { get; set; } = new();
+        public List<RetagTrackFilePreview> Retags { get; set; } = new();
+        public List<string> Skipped { get; set; } = new();
 
         public IEnumerable<int> FileIds => Renames.Select(x => x.TrackFileId).Concat(Retags.Select(x => x.TrackFileId));
     }
@@ -27,7 +27,7 @@ namespace NzbDrone.Core.MediaFiles
     public class ApplyArtistFilePreviewsCommand : Command
     {
         public ArtistFileOperation Operation { get; set; }
-        public Dictionary<int, string> Reviews { get; set; } = new ();
+        public Dictionary<int, string> Reviews { get; set; } = new();
 
         public override bool SendUpdatesToClient => true;
         public override bool RequiresDiskAccess => true;

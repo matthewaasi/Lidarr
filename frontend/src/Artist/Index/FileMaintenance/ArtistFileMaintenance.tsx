@@ -16,6 +16,7 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
+import PageToolbarOverflowMenuItem from 'Components/Page/Toolbar/PageToolbarOverflowMenuItem';
 import { icons, kinds } from 'Helpers/Props';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
@@ -173,10 +174,20 @@ export function ArtistFileMaintenanceProvider({ children }: { children: ReactNod
   );
 }
 
-export function ArtistFileMaintenanceButtons({ artists, isSelectMode }: {
+interface ArtistFileMaintenanceButtonProps {
   artists: Artist[];
   isSelectMode: boolean;
-}) {
+  label: string;
+  operation: Operation;
+  overflowComponent?: typeof ArtistFileMaintenanceMenuItem;
+}
+
+function useMaintenanceButton({
+  artists,
+  isSelectMode,
+  operation,
+  label,
+}: ArtistFileMaintenanceButtonProps) {
   const [selection] = useSelect();
   const maintenance = useContext(MaintenanceContext);
   const selected = isSelectMode
@@ -184,22 +195,22 @@ export function ArtistFileMaintenanceButtons({ artists, isSelectMode }: {
     : [];
   const scope = selected.length ? selected : artists;
 
-  return (
-    <>
-      <PageToolbarButton
-        label={previewTitle('rename')}
-        iconName={icons.ORGANIZE}
-        isDisabled={!scope.length}
-        onPress={() => maintenance?.open({ operation: 'rename', artists: scope })}
-      />
-      <PageToolbarButton
-        label={previewTitle('retag')}
-        iconName={icons.RETAG}
-        isDisabled={!scope.length}
-        onPress={() => maintenance?.open({ operation: 'retag', artists: scope })}
-      />
-    </>
-  );
+  return {
+    label,
+    iconName: operation === 'rename' ? icons.ORGANIZE : icons.RETAG,
+    isDisabled: !scope.length,
+    onPress: () => maintenance?.open({ operation, artists: scope }),
+  };
+}
+
+export function ArtistFileMaintenanceButton(props: ArtistFileMaintenanceButtonProps) {
+  const button = useMaintenanceButton(props);
+  return <PageToolbarButton {...button} />;
+}
+
+export function ArtistFileMaintenanceMenuItem(props: ArtistFileMaintenanceButtonProps) {
+  const button = useMaintenanceButton(props);
+  return <PageToolbarOverflowMenuItem {...button} />;
 }
 
 export function ArtistFileStatusLabel({ artistId, artistName, operation }: {

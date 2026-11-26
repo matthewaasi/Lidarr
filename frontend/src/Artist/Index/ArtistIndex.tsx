@@ -42,7 +42,8 @@ import ArtistIndexRefreshArtistsButton from './ArtistIndexRefreshArtistsButton';
 import ArtistIndexBanners from './Banners/ArtistIndexBanners';
 import ArtistIndexBannerOptionsModal from './Banners/Options/ArtistIndexBannerOptionsModal';
 import {
-  ArtistFileMaintenanceButtons,
+  ArtistFileMaintenanceButton,
+  ArtistFileMaintenanceMenuItem,
   ArtistFileMaintenanceProvider,
 } from './FileMaintenance/ArtistFileMaintenance';
 import ArtistIndexFilterMenu from './Menus/ArtistIndexFilterMenu';
@@ -245,7 +246,21 @@ const ArtistIndex = withScrollPosition((props: ArtistIndexProps) => {
                 onPress={onRssSyncPress}
               />
 
-              <ArtistFileMaintenanceButtons artists={items} isSelectMode={isSelectMode} />
+              <ArtistFileMaintenanceButton
+                artists={items}
+                isSelectMode={isSelectMode}
+                label={translate('PreviewRename')}
+                operation="rename"
+                overflowComponent={ArtistFileMaintenanceMenuItem}
+              />
+
+              <ArtistFileMaintenanceButton
+                artists={items}
+                isSelectMode={isSelectMode}
+                label={translate('PreviewRetag')}
+                operation="retag"
+                overflowComponent={ArtistFileMaintenanceMenuItem}
+              />
 
               <PageToolbarSeparator />
 

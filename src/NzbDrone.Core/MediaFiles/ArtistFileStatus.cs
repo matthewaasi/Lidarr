@@ -61,8 +61,10 @@ namespace NzbDrone.Core.MediaFiles
         IHandle<TrackFileRenamedEvent>,
         IHandle<TrackFileRetaggedEvent>,
         IHandle<ArtistUpdatedEvent>,
+        IHandle<ArtistEditedEvent>,
         IHandle<ArtistMovedEvent>,
         IHandle<AlbumUpdatedEvent>,
+        IHandle<AlbumEditedEvent>,
         IHandle<AlbumDeletedEvent>,
         IHandle<AlbumInfoRefreshedEvent>,
         IHandle<ArtistsDeletedEvent>,
@@ -156,8 +158,10 @@ namespace NzbDrone.Core.MediaFiles
         public void Handle(TrackFileRenamedEvent message) => Invalidate(message.Artist.Id, ArtistFileOperation.Rename);
         public void Handle(TrackFileRetaggedEvent message) => Invalidate(message.Artist.Id, ArtistFileOperation.Retag);
         public void Handle(ArtistUpdatedEvent message) => Invalidate(message.Artist.Id);
+        public void Handle(ArtistEditedEvent message) => Invalidate(message.Artist.Id);
         public void Handle(ArtistMovedEvent message) => Invalidate(message.Artist.Id);
         public void Handle(AlbumUpdatedEvent message) => Invalidate(message.Album.ArtistId);
+        public void Handle(AlbumEditedEvent message) => Invalidate(message.Album.ArtistId);
         public void Handle(AlbumDeletedEvent message) => Invalidate(message.Album.ArtistId);
         public void Handle(ModelEvent<TrackFile> message) => Invalidate(message.Model);
 
