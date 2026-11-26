@@ -6,9 +6,11 @@ import React, {
   useEffect,
   useState,
 } from 'react';
+import { useSelector } from 'react-redux';
 import { useSelect } from 'App/SelectContext';
 import Artist from 'Artist/Artist';
 import Alert from 'Components/Alert';
+import CheckInput from 'Components/Form/CheckInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
 import Modal from 'Components/Modal/Modal';
@@ -18,6 +20,9 @@ import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
 import PageToolbarOverflowMenuItem from 'Components/Page/Toolbar/PageToolbarOverflowMenuItem';
+import OrganizePreviewRow from 'Organize/OrganizePreviewRow';
+import organizeStyles from 'Organize/OrganizePreviewModalContent.css';
+import createAllArtistSelector from 'Store/Selectors/createAllArtistSelector';
 import { icons, kinds } from 'Helpers/Props';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
@@ -191,6 +196,7 @@ function useMaintenanceButton({
   label,
 }: ArtistFileMaintenanceButtonProps) {
   const [selection] = useSelect();
+  const libraryArtists = useSelector(createAllArtistSelector());
   const maintenance = useContext(MaintenanceContext);
   const selected = isSelectMode
     ? artists.filter((artist) => selection.selectedState[artist.id])
@@ -201,7 +207,13 @@ function useMaintenanceButton({
     label,
     iconName: operation === 'rename' ? icons.ORGANIZE : icons.RETAG,
     isDisabled: !scope.length,
-    onPress: () => maintenance?.open({ operation, artists: scope }),
+    onPress: () => {
+      const names = new Map(libraryArtists.map((artist) => [artist.id, artist.artistName]));
+      maintenance?.open({
+        operation,
+        artists: scope.map(({ id }) => ({ id, artistName: names.get(id) ?? `Artist ${id}` })),
+      });
+    },
   };
 }
 
@@ -262,6 +274,9 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
   onQueued: (id: number) => void;
 }) {
   const { operation, artists } = target;
+  const isRename = operation === 'rename';
+  const [naming, setNaming] = useState<{ renameTracks: boolean; standardTrackFormat: string; multiDiscTrackFormat: string }>();
+  const [deselected, setDeselected] = useState<Set<number>>(new Set());
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [checking, setChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -279,7 +294,7 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
     };
   }, []);
 
-  async function check() {
+  const check = useCallback(async (signal?: AbortSignal) => {
     setStarted(true);
     setChecking(true);
     const results: PreviewRow[] = [];
@@ -300,7 +315,7 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
         requests.current.delete(request);
       }
 
-      if (!active.current) {
+      if (!active.current || signal?.aborted) {
         return;
       }
 
@@ -309,23 +324,69 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
     }
 
     setChecking(false);
-  }
+  }, [artists, operation]);
+
+  useEffect(() => {
+    if (!isRename) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const request = createAjaxRequest({ url: '/config/naming', dataType: 'json' });
+    request.request.then((config: NonNullable<typeof naming>) => {
+      if (!controller.signal.aborted) {
+        setNaming(config);
+      }
+    }, () => {});
+    void check(controller.signal);
+
+    return () => {
+      controller.abort();
+      request.abortRequest();
+    };
+  }, [check, isRename]);
 
   const ready = rows.filter((row) => row.key && (row.renames.length || row.retags.length));
   const issues = rows.filter((row) => row.skipped.length).length;
   const current = rows.filter((row) => !row.renames.length && !row.retags.length && !row.skipped.length).length;
-  const fileCount = ready.reduce((count, row) => count + row.renames.length + row.retags.length, 0);
+  const renameIds = ready.flatMap((row) => row.renames.map((file) => file.trackFileId));
+  const selectedRenameCount = renameIds.filter((id) => !deselected.has(id)).length;
+  const fileCount = isRename ? selectedRenameCount : ready.reduce((count, row) => count + row.retags.length, 0);
+
+  function onRenameSelected({ id, value }: { id: number; value: boolean }) {
+    setDeselected((previous) => {
+      if (previous.has(id) === !value) {
+        return previous;
+      }
+
+      const next = new Set(previous);
+      if (value) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function apply() {
     setSubmitting(true);
     setSubmitError(false);
+    const selectedFiles = Object.fromEntries(ready.map((row) => [
+      row.id,
+      row.renames.filter((file) => !deselected.has(file.trackFileId)).map((file) => file.trackFileId),
+    ]));
+    const reviewed = isRename ? ready.filter((row) => selectedFiles[row.id].length) : ready;
     const request = createAjaxRequest({
       url: '/artistfilemaintenance/apply',
       method: 'POST',
       dataType: 'json',
       data: JSON.stringify({
         operation,
-        reviews: Object.fromEntries(ready.map((row) => [row.id, row.key])),
+        reviews: Object.fromEntries(reviewed.map((row) => [row.id, row.key])),
+        selectedFiles: isRename
+          ? Object.fromEntries(reviewed.map((row) => [row.id, selectedFiles[row.id]]))
+          : undefined,
       }),
     });
 
@@ -345,7 +406,7 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
   return (
     <Modal isOpen={true} onModalClose={submitting ? preventClose : close}>
       <ModalContent onModalClose={submitting ? preventClose : close}>
-        <ModalHeader>{previewTitle(operation)}</ModalHeader>
+        <ModalHeader>{isRename ? 'Organize & Rename' : previewTitle(operation)}</ModalHeader>
         <ModalBody>
           <p>{artists.length} {artists.length === 1 ? 'artist' : 'artists'} in scope</p>
           {checking ? <p>Checking {rows.length} of {artists.length} artists…</p> : null}
@@ -353,16 +414,48 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
             <p>{ready.length} with changes · {current} up to date · {issues} with skips or errors</p>
           ) : null}
           {submitError ? <Alert kind={kinds.DANGER}>Unable to queue the reviewed changes.</Alert> : null}
-          {rows.map((row) => (
+          {isRename && naming && renameIds.length > 0 ? (
+            <Alert>
+              {naming.renameTracks ? (
+                <>
+                  <div>Naming pattern: <span className={organizeStyles.trackFormat}>{naming.standardTrackFormat}</span></div>
+                  {naming.multiDiscTrackFormat !== naming.standardTrackFormat ? (
+                    <div>Multi-disc: <span className={organizeStyles.trackFormat}>{naming.multiDiscTrackFormat}</span></div>
+                  ) : null}
+                </>
+              ) : 'Track renaming is disabled in Naming settings.'}
+            </Alert>
+          ) : null}
+          {isRename && started && !checking && !renameIds.length && !issues ? (
+            <div>{translate('SuccessMyWorkIsDoneNoFilesToRename')}</div>
+          ) : null}
+          {isRename ? rows.filter((row) => row.renames.length || row.skipped.length).map((row) => (
+            <section key={row.id} className={organizeStyles.previews}>
+              {artists.length > 1 ? <h3>{row.artistName}</h3> : null}
+              {row.renames.map((file) => (
+                <OrganizePreviewRow
+                  key={file.trackFileId}
+                  id={file.trackFileId}
+                  existingPath={file.existingPath}
+                  newPath={file.newPath}
+                  isSelected={!deselected.has(file.trackFileId)}
+                  onSelectedChange={onRenameSelected}
+                />
+              ))}
+              {row.skipped.length ? (
+                <details>
+                  <summary>{row.skipped.length} skipped or failed</summary>
+                  <ul>{row.skipped.map((detail, index) => <li key={`${detail}:${index}`}>{detail}</li>)}</ul>
+                </details>
+              ) : null}
+            </section>
+          )) : rows.map((row) => (
             <details key={row.id}>
               <summary>
                 {row.artistName} · {row.renames.length + row.retags.length} changes
                 {row.skipped.length ? ` · ${row.skipped.length} skipped or failed` : ''}
               </summary>
               <ul>
-                {row.renames.map((file) => (
-                  <li key={file.trackFileId}>{file.existingPath} → {file.newPath}</li>
-                ))}
                 {row.retags.map((file) => (
                   <li key={file.trackFileId}>
                     {file.path}
@@ -381,11 +474,21 @@ function ArtistFilePreviewModal({ target, close, onQueued }: {
           ))}
         </ModalBody>
         <ModalFooter>
-          <Button isDisabled={submitting} onPress={close}>{translate('Close')}</Button>
-          {!started ? <Button kind={kinds.PRIMARY} onPress={check}>{'Check files'}</Button> : null}
+          {isRename && renameIds.length > 0 && !checking ? (
+            <CheckInput
+              className={organizeStyles.selectAllInput}
+              containerClassName={organizeStyles.selectAllInputContainer}
+              name="selectAll"
+              value={selectedRenameCount === renameIds.length ? true : selectedRenameCount === 0 ? false : null}
+              isDisabled={submitting}
+              onChange={({ value }: { value: boolean }) => setDeselected(new Set(value ? [] : renameIds))}
+            />
+          ) : null}
+          <Button isDisabled={submitting} onPress={close}>{translate(isRename ? 'Cancel' : 'Close')}</Button>
+          {!isRename && !started ? <Button kind={kinds.PRIMARY} onPress={() => check()}>Check files</Button> : null}
           {fileCount > 0 && !checking ? (
-            <Button kind={kinds.WARNING} isDisabled={submitting} onPress={apply}>
-              Apply {fileCount} file changes
+            <Button kind={isRename ? kinds.PRIMARY : kinds.WARNING} isDisabled={submitting} onPress={apply}>
+              {isRename ? translate('Organize') : `Apply ${fileCount} file changes`}
             </Button>
           ) : null}
         </ModalFooter>

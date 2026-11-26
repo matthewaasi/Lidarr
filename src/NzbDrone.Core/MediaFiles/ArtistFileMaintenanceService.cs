@@ -28,6 +28,7 @@ namespace NzbDrone.Core.MediaFiles
     {
         public ArtistFileOperation Operation { get; set; }
         public Dictionary<int, string> Reviews { get; set; } = new();
+        public Dictionary<int, List<int>> SelectedFiles { get; set; }
 
         public override bool SendUpdatesToClient => true;
         public override bool RequiresDiskAccess => true;
@@ -208,6 +209,20 @@ namespace NzbDrone.Core.MediaFiles
                         continue;
                     }
 
+                    if (message.SelectedFiles != null)
+                    {
+                        if (message.Operation != ArtistFileOperation.Rename ||
+                            !message.SelectedFiles.TryGetValue(artistId, out var selected) ||
+                            selected == null || selected.Count == 0 || selected.Except(ids).Any())
+                        {
+                            ++incomplete;
+                            _status.Record(artistId, message.Operation, settings, ids.Count, true);
+                            continue;
+                        }
+
+                        ids = selected.Distinct().ToList();
+                    }
+
                     if (message.Operation == ArtistFileOperation.Rename)
                     {
                         _renameFiles.Execute(new RenameFilesCommand(artistId, ids));
@@ -219,7 +234,7 @@ namespace NzbDrone.Core.MediaFiles
 
                     var verified = Preview(artistId, message.Operation, false);
                     var pending = verified.FileIds.Count();
-                    var failed = verified.Skipped.Count > 0 || pending > 0 ||
+                    var failed = verified.Skipped.Count > 0 || verified.FileIds.Intersect(ids).Any() ||
                         settings != _status.GetSettings(message.Operation);
                     _status.Record(artistId, message.Operation, settings, pending, failed, applied: true);
                     if (failed)
