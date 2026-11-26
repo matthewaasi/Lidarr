@@ -93,13 +93,31 @@ namespace NzbDrone.Core.Test.MediaFilesTests.LibraryAudit
             Assert.That(VersionAudit.Evaluate(_file, new[] { new Track { Title = "Song (Radio Edit)", Duration = 1000, ForeignRecordingId = "radio" } }), Is.Null);
         }
 
-        [Test]
-        public void long_unlabeled_track_is_not_automatically_an_extended_mix()
+        [TestCase(700, "500.0 seconds longer")]
+        [TestCase(30, "170.0 seconds shorter")]
+        public void flags_unlabeled_duration_mismatches_without_guessing_a_version(double actual, string reason)
         {
             _file.CatalogTitle = _file.TagTitle = "Song";
             _file.Path = "/music/Song.flac";
-            _file.DurationSeconds = 700;
+            _file.DurationSeconds = actual;
             _file.CatalogDurationSeconds = 200;
+
+            var evidence = VersionAudit.Evaluate(_file, Array.Empty<Track>());
+
+            Assert.That(evidence.Confidence, Is.EqualTo("uncertain"));
+            Assert.That(evidence.Reason, Does.Contain(reason));
+            Assert.That(evidence.Candidates, Is.Empty);
+        }
+
+        [TestCase(190, 200)]
+        [TestCase(210, 200)]
+        [TestCase(200, 0)]
+        [TestCase(0, 200)]
+        public void skips_durations_within_tolerance_or_missing(double actual, double expected)
+        {
+            _file.DurationSeconds = actual;
+            _file.CatalogDurationSeconds = expected;
+
             Assert.That(VersionAudit.Evaluate(_file, Array.Empty<Track>()), Is.Null);
         }
 

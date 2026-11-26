@@ -9,8 +9,8 @@ import { featureError } from 'Settings/FeatureSettings';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import styles from './LibraryAudit.css';
 
-const labels = { version: 'Version mismatch', duplicate: 'Exact duplicate files', versionError: 'File inspection failed', duplicateError: 'Duplicate inspection failed', fingerprintError: 'Fingerprint unavailable' };
-const confidenceLabels = { exact: 'Exact file match', supported: 'Fingerprint-supported mismatch', uncertain: 'Version uncertain', unavailable: 'Evidence unavailable' };
+const labels = { version: 'Duration or version mismatch', duplicate: 'Exact duplicate files', versionError: 'File inspection failed', duplicateError: 'Duplicate inspection failed', fingerprintError: 'Fingerprint unavailable' };
+const confidenceLabels = { exact: 'Exact file match', supported: 'Fingerprint-supported mismatch', uncertain: 'Needs review', unavailable: 'Evidence unavailable' };
 const fileSize = (bytes) => `${bytes.toLocaleString()} bytes (${(bytes / 1024 / 1024).toFixed(2)} MiB)`;
 const duration = (seconds) => (seconds > 0 ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}` : 'Unknown');
 
@@ -220,7 +220,7 @@ class LibraryAudit extends Component {
             <label>
               <input type="checkbox" checked={versions}
                 disabled={scanning || busy} onChange={(event) => this.setState({ versions: event.target.checked })}
-              /> Version audit
+              /> Track duration and version audit
             </label>
             <label>
               <input type="checkbox" checked={duplicates}
@@ -235,7 +235,7 @@ class LibraryAudit extends Component {
             <button disabled={scanning || busy || (!versions && !duplicates)} onClick={this.onScan}>{scanning ? 'Scanning…' : 'Scan library'}</button>
             <button disabled={loading || busy} onClick={this.onLoad}>Refresh findings</button>
           </div>
-          <p>Version checks compare filename, embedded title and assigned catalog duration. Suggested versions come from the same artist’s local catalog. These are clues, not proof of the audio version. Duplicate checks read complete files of equal size and require identical SHA-256 hashes; differently tagged or encoded copies will not match. Large scans can take time.</p>
+          <p>The audit flags single-track files whose measured duration is more than 10 seconds shorter or longer than the assigned catalog track. It also checks version labels in filenames and titles. Suggested versions come from the same artist’s local catalog. These are clues, not proof of the audio version. Duplicate checks read complete files of equal size and require identical SHA-256 hashes; differently tagged or encoded copies will not match. Large scans can take time.</p>
           <p>Optional deep checks require fpcalc and send audio fingerprints and durations to AcoustID using Lidarr’s existing lookup. This checks every assigned single-track file and can be slow. Fingerprint associations support review; they do not prove a mix label.</p>
           {this.renderProgress()}
           {scanning ? <Alert>The scan continues if you leave this page. Cancel a running audit under System → Tasks. Findings appear when the scan finishes.</Alert> : null}
@@ -251,7 +251,7 @@ class LibraryAudit extends Component {
               <select name="kind" value={kind}
                 disabled={busy || loading} onChange={this.onFilter}
               >
-                <option value="all">All types</option><option value="version">Version mismatches</option><option value="duplicate">Exact duplicates</option><option value="errors">Inspection errors</option>
+                <option value="all">All types</option><option value="version">Duration and version mismatches</option><option value="duplicate">Exact duplicates</option><option value="errors">Inspection errors</option>
               </select></label>
             <span>{total} findings</span>
           </div>
