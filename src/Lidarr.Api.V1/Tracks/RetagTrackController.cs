@@ -11,9 +11,12 @@ namespace Lidarr.Api.V1.Tracks
     {
         private readonly IAudioTagService _audioTagService;
 
-        public RetagTrackController(IAudioTagService audioTagService)
+        private readonly IArtistFileMaintenanceService _maintenance;
+
+        public RetagTrackController(IAudioTagService audioTagService, IArtistFileMaintenanceService maintenance)
         {
             _audioTagService = audioTagService;
+            _maintenance = maintenance;
         }
 
         [HttpGet]
@@ -22,6 +25,12 @@ namespace Lidarr.Api.V1.Tracks
             if (albumId.HasValue)
             {
                 return _audioTagService.GetRetagPreviewsByAlbum(albumId.Value).Where(x => x.Changes.Any()).ToResource();
+            }
+
+            var preview = _maintenance.Preview(artistId, ArtistFileOperation.Retag);
+            if (preview.Skipped.Count == 0)
+            {
+                return preview.Retags.ToResource();
             }
 
             return _audioTagService.GetRetagPreviewsByArtist(artistId).Where(x => x.Changes.Any()).ToResource();

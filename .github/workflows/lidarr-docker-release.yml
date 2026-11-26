@@ -2,7 +2,7 @@ name: Lidarr Docker release
 
 on:
   push:
-    branches: ['release/ai.24']
+    branches: ['release/ai.25']
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERSION: 3.2.1.5196-ai.24
+      VERSION: 3.2.1.5196-ai.25
     steps:
       - uses: actions/checkout@v4
       - name: Build and smoke-test the Linux amd64 image
@@ -25,6 +25,9 @@ jobs:
           trap 'docker rm -f lidarr-smoke >/dev/null' EXIT
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:8686/ping; then
+              api_key=$(docker exec lidarr-smoke cat /config/config.xml | sed -n 's:.*<ApiKey>\([^<]*\)</ApiKey>.*:\1:p')
+              test -n "$api_key"
+              curl -fsS -H "X-Api-Key: $api_key" http://127.0.0.1:8686/api/v1/artistfilemaintenance | python3 -c 'import json, sys; assert json.load(sys.stdin) == []'
               docker exec --user abc --workdir /app/lidarr/bin lidarr-smoke /app/lidarr/bin/fpcalc -version
               exit 0
             fi
@@ -40,4 +43,4 @@ jobs:
           docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
           gh release create "v$VERSION" "$archive" \
             --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
-            --notes-file docs/releases/ai.24.md
+            --notes-file docs/releases/ai.25.md

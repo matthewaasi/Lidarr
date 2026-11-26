@@ -28,6 +28,8 @@ namespace NzbDrone.Core.MediaFiles
         {
         }
 
+        protected override bool PublishModelEvents => true;
+
         // always join with all the other good stuff
         // needed more often than not so better to load it all now
         protected override SqlBuilder Builder() => new SqlBuilder(_database.DatabaseType)

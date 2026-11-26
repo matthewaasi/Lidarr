@@ -30,6 +30,7 @@ import translate from 'Utilities/String/translate';
 import AlbumsCell from './AlbumsCell';
 import hasGrowableColumns from './hasGrowableColumns';
 import selectTableOptions from './selectTableOptions';
+import { ArtistFileStatusLabel } from '../FileMaintenance/ArtistFileMaintenance';
 import styles from './ArtistIndexRow.css';
 
 interface ArtistIndexRowProps {
@@ -156,6 +157,18 @@ function ArtistIndexRow(props: ArtistIndexRowProps) {
 
         if (!isVisible) {
           return null;
+        }
+
+        if (name === 'renameStatus' || name === 'retagStatus') {
+          return (
+            <VirtualTableRowCell key={name}>
+              <ArtistFileStatusLabel
+                artistId={artistId}
+                artistName={artistName}
+                operation={name === 'renameStatus' ? 'rename' : 'retag'}
+              />
+            </VirtualTableRowCell>
+          );
         }
 
         if (name === 'status') {

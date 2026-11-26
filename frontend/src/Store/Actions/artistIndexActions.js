@@ -77,6 +77,18 @@ export const defaultState = {
       isModifiable: false
     },
     {
+      name: 'renameStatus',
+      label: () => translate('RenameFiles'),
+      isSortable: false,
+      isVisible: false
+    },
+    {
+      name: 'retagStatus',
+      label: () => translate('Retag'),
+      isSortable: false,
+      isVisible: false
+    },
+    {
       name: 'artistType',
       label: () => translate('Type'),
       isSortable: true,

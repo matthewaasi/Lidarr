@@ -62,6 +62,7 @@ namespace NzbDrone.Core.Datastore
             Mapper.Entity<Config>("Config").RegisterModel();
             Mapper.Entity<SingleDecision>("SinglesDecisions").RegisterModel();
             Mapper.Entity<LibraryAuditFinding>("LibraryAuditFindings").RegisterModel();
+            Mapper.Entity<ArtistFileStatus>("ArtistFileStatuses").RegisterModel();
 
             Mapper.Entity<RootFolder>("RootFolders").RegisterModel()
                   .Ignore(r => r.Accessible)

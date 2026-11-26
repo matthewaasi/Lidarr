@@ -10,9 +10,12 @@ namespace Lidarr.Api.V1.Tracks
     {
         private readonly IRenameTrackFileService _renameTrackFileService;
 
-        public RenameTrackController(IRenameTrackFileService renameTrackFileService)
+        private readonly IArtistFileMaintenanceService _maintenance;
+
+        public RenameTrackController(IRenameTrackFileService renameTrackFileService, IArtistFileMaintenanceService maintenance)
         {
             _renameTrackFileService = renameTrackFileService;
+            _maintenance = maintenance;
         }
 
         [HttpGet]
@@ -21,6 +24,12 @@ namespace Lidarr.Api.V1.Tracks
             if (albumId.HasValue)
             {
                 return _renameTrackFileService.GetRenamePreviews(artistId, albumId.Value).ToResource();
+            }
+
+            var preview = _maintenance.Preview(artistId, ArtistFileOperation.Rename);
+            if (preview.Skipped.Count == 0)
+            {
+                return preview.Renames.ToResource();
             }
 
             return _renameTrackFileService.GetRenamePreviews(artistId).ToResource();

@@ -27,6 +27,7 @@ namespace NzbDrone.Core.MediaFiles
         void RemoveMusicBrainzTags(IEnumerable<Track> tracks);
         void RemoveMusicBrainzTags(TrackFile trackfile);
         List<RetagTrackFilePreview> GetRetagPreviewsByArtist(int artistId);
+        List<RetagTrackFilePreview> GetRetagPreviewsForFiles(List<TrackFile> files, Action<string> skip);
         List<RetagTrackFilePreview> GetRetagPreviewsByAlbum(int artistId);
     }
 
@@ -382,11 +383,30 @@ namespace NzbDrone.Core.MediaFiles
             return GetPreviews(files).ToList();
         }
 
-        private IEnumerable<RetagTrackFilePreview> GetPreviews(List<TrackFile> files)
+        public List<RetagTrackFilePreview> GetRetagPreviewsForFiles(List<TrackFile> files, Action<string> skip)
+        {
+            var previews = new List<RetagTrackFilePreview>();
+            foreach (var file in files)
+            {
+                try
+                {
+                    previews.AddRange(GetPreviews(new List<TrackFile> { file }, skip));
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn(ex, "Unable to preview tags for {0}", file.Path);
+                    skip($"{file.Path} (unable to compare tags)");
+                }
+            }
+
+            return previews;
+        }
+
+        private IEnumerable<RetagTrackFilePreview> GetPreviews(List<TrackFile> files, Action<string> skip = null)
         {
             foreach (var f in files.OrderBy(x => x.Album.Value.Title)
-                     .ThenBy(x => x.Tracks.Value.First().MediumNumber)
-                     .ThenBy(x => x.Tracks.Value.First().AbsoluteTrackNumber))
+                     .ThenBy(x => x.Tracks.Value.FirstOrDefault()?.MediumNumber)
+                     .ThenBy(x => x.Tracks.Value.FirstOrDefault()?.AbsoluteTrackNumber))
             {
                 var file = f;
 
@@ -404,6 +424,12 @@ namespace NzbDrone.Core.MediaFiles
 
                 var oldTags = ReadAudioTag(f.Path);
                 var newTags = GetTrackMetadata(f);
+
+                if (!oldTags.IsValid || !newTags.IsValid)
+                {
+                    skip?.Invoke($"{f.Path} (unable to compare tags)");
+                    continue;
+                }
 
                 // We don't overwrite image when new image is null
                 if (newTags.ImageFile == null && !_configService.ScrubAudioTags)
