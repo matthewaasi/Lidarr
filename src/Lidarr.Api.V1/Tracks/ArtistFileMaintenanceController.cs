@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Lidarr.Http;
@@ -36,7 +37,7 @@ namespace Lidarr.Api.V1.Tracks
         [HttpGet("preview")]
         public IActionResult Preview(int artistId, ArtistFileOperation operation)
         {
-            if (artistId <= 0 || !System.Enum.IsDefined(operation))
+            if (artistId <= 0 || !Enum.IsDefined(operation))
             {
                 return BadRequest();
             }
@@ -54,7 +55,7 @@ namespace Lidarr.Api.V1.Tracks
         [HttpPost("apply")]
         public IActionResult Apply([FromBody] ApplyArtistFilePreviewsCommand command)
         {
-            if (command == null || !System.Enum.IsDefined(command.Operation) ||
+            if (command == null || !Enum.IsDefined(command.Operation) ||
                 command.Reviews == null || command.Reviews.Count == 0 ||
                 command.Reviews.Any(x => x.Key <= 0 || x.Value?.Length != 64))
             {
