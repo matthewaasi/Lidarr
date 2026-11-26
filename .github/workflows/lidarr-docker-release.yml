@@ -2,7 +2,7 @@ name: Lidarr Docker release
 
 on:
   push:
-    branches: ['release/ai.25']
+    branches: ['release/ai.26']
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERSION: 3.2.1.5196-ai.25
+      VERSION: 3.2.1.5196-ai.26
     steps:
       - uses: actions/checkout@v4
       - name: Build and smoke-test the Linux amd64 image
@@ -43,4 +43,4 @@ jobs:
           docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
           gh release create "v$VERSION" "$archive" \
             --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
-            --notes-file docs/releases/ai.25.md
+            --notes-file docs/releases/ai.26.md

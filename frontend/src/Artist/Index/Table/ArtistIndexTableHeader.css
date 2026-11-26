@@ -95,3 +95,11 @@
 
   flex: 0 1 90px;
 }
+
+.renameStatus,
+.retagStatus {
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
+
+  flex: 0 0 132px;
+  min-width: 0;
+}

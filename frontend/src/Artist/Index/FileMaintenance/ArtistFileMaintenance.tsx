@@ -9,6 +9,7 @@ import React, {
 import { useSelect } from 'App/SelectContext';
 import Artist from 'Artist/Artist';
 import Alert from 'Components/Alert';
+import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
 import Modal from 'Components/Modal/Modal';
 import ModalBody from 'Components/Modal/ModalBody';
@@ -20,6 +21,7 @@ import PageToolbarOverflowMenuItem from 'Components/Page/Toolbar/PageToolbarOver
 import { icons, kinds } from 'Helpers/Props';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
+import styles from './ArtistFileMaintenance.css';
 
 type Operation = 'rename' | 'retag';
 
@@ -225,14 +227,27 @@ export function ArtistFileStatusLabel({ artistId, artistName, operation }: {
     status?.lastApplied ? `Applied: ${new Date(status.lastApplied).toLocaleString()}` : '',
   ].filter(Boolean).join('\n');
 
+  const state = maintenance?.unavailable ? 'unavailable' : status?.state ?? 'notChecked';
+  const label = state === 'unavailable' ? 'Status unavailable' : labels[state];
+  const pending = state === 'changesPending' ? ` (${status?.pending})` : '';
+  const statusIcons = {
+    upToDate: icons.CHECK_CIRCLE,
+    changesPending: icons.RETAG,
+    needsRecheck: icons.HISTORY,
+    notChecked: icons.CHECK_INDETERMINATE,
+    failed: icons.WARNING,
+    unavailable: icons.WARNING,
+  };
+
   return (
     <button
       type="button"
-      title={details}
+      className={styles.statusButton}
+      title={[label + pending, details].filter(Boolean).join('\n')}
       onClick={() => maintenance?.open({ operation, artists: [{ id: artistId, artistName }] })}
     >
-      {maintenance?.unavailable ? 'Status unavailable' : labels[status?.state ?? 'notChecked']}
-      {status?.state === 'changesPending' ? ` (${status.pending})` : ''}
+      <Icon className={styles[state]} name={statusIcons[state]} size={12} />
+      <span className={styles.statusText}>{label}{pending}</span>
     </button>
   );
 }

@@ -17,6 +17,8 @@ interface CssExports {
   'qualityProfileId': string;
   'ratings': string;
   'sizeOnDisk': string;
+  'renameStatus': string;
+  'retagStatus': string;
   'sortName': string;
   'status': string;
   'tags': string;

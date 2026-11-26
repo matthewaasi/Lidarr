@@ -140,3 +140,11 @@
 
   margin-top: 0;
 }
+
+.renameStatus,
+.retagStatus {
+  composes: cell;
+
+  flex: 0 0 132px;
+  min-width: 0;
+}

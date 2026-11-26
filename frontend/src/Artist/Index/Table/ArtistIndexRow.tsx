@@ -161,7 +161,7 @@ function ArtistIndexRow(props: ArtistIndexRowProps) {
 
         if (name === 'renameStatus' || name === 'retagStatus') {
           return (
-            <VirtualTableRowCell key={name}>
+            <VirtualTableRowCell key={name} className={styles[name]}>
               <ArtistFileStatusLabel
                 artistId={artistId}
                 artistName={artistName}
