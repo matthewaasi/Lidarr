@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:22-bookworm-slim AS frontend
+FROM node:24-bookworm-slim AS frontend
 WORKDIR /src
 COPY package.json yarn.lock ./
 RUN npm install --global --force yarn@1.22.22 && yarn install --frozen-lockfile --network-timeout 120000
@@ -7,22 +7,20 @@ COPY tsconfig.json ./
 COPY frontend/ frontend/
 RUN node node_modules/webpack/bin/webpack.js --config frontend/build/webpack.config.js --env production
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0.421 AS backend
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS backend
 WORKDIR /src
 COPY global.json .editorconfig ./
 COPY src/ src/
 COPY Logo/ Logo/
-RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net8.0 -r linux-musl-x64 --self-contained true \
-    -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=3.2.1.5196 -p:AssemblyConfiguration=nightly-ai -o /out \
-    && dotnet publish src/NzbDrone.Mono/Lidarr.Mono.csproj -c Release -f net8.0 -r linux-musl-x64 --self-contained true \
-    -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=3.2.1.5196 -p:AssemblyConfiguration=nightly-ai -o /out
+RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net10.0 -r linux-musl-x64 --self-contained true \
+    -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=4.0.0.5247 -p:AssemblyConfiguration=nightly-ai -o /out \
+    && dotnet publish src/NzbDrone.Mono/Lidarr.Mono.csproj -c Release -f net10.0 -r linux-musl-x64 --self-contained true \
+    -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=4.0.0.5247 -p:AssemblyConfiguration=nightly-ai -o /out
 
-FROM ghcr.io/linuxserver/lidarr:nightly-3.2.1.5196-ls224@sha256:d1e3b469e618fa54b56bc487442efc231142096db3188cd3a4d5b1393b919e5e
-ARG FORK_VERSION=3.2.1.5196-ai.29
+FROM ghcr.io/linuxserver/lidarr:nightly-4.0.0.5247-ls230
+ARG FORK_VERSION=4.0.0.5247-ai.30
 ARG VCS_REF=unknown
-RUN cp /app/lidarr/bin/fpcalc /tmp/lidarr-fpcalc \
-    && rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin \
-    && mv /tmp/lidarr-fpcalc /app/lidarr/bin/fpcalc
+RUN rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin
 COPY --from=backend /out/ /app/lidarr/bin/
 COPY --from=frontend /src/_output/UI/ /app/lidarr/bin/UI/
 COPY LICENSE.md /app/lidarr/bin/LICENSE.md

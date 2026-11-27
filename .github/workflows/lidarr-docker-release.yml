@@ -2,7 +2,7 @@ name: Lidarr Docker release
 
 on:
   push:
-    branches: ['release/ai.29']
+    branches: ['release/4.0-ai.30']
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERSION: 3.2.1.5196-ai.29
+      VERSION: 4.0.0.5247-ai.30
     steps:
       - uses: actions/checkout@v4
       - name: Build and smoke-test the Linux amd64 image
@@ -35,18 +35,45 @@ jobs:
           done
           docker logs lidarr-smoke
           exit 1
-      - name: Test indexer search and version audit
+      - name: Test an SQLite upgrade from ai.29
         run: |
-          docker run --rm -v "$PWD:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0.421 \
-            dotnet test src/NzbDrone.Core.Test/Lidarr.Core.Test.csproj -c Release -f net8.0 \
+          old_version=3.2.1.5196-ai.29
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/v$old_version/lidarr-ai-$old_version-amd64.tar.gz" | docker load
+          docker volume create lidarr-upgrade
+          trap 'docker rm -f lidarr-upgrade-test >/dev/null 2>&1 || true; docker volume rm lidarr-upgrade >/dev/null' EXIT
+          start_lidarr() {
+            docker run -d --name lidarr-upgrade-test -p 127.0.0.1:8686:8686 -v lidarr-upgrade:/config "lidarr-ai:$1"
+            for attempt in $(seq 1 45); do
+              if curl -fsS http://127.0.0.1:8686/ping; then
+                return
+              fi
+              sleep 2
+            done
+            docker logs lidarr-upgrade-test
+            return 1
+          }
+          start_lidarr "$old_version"
+          api_key=$(docker exec lidarr-upgrade-test cat /config/config.xml | sed -n 's:.*<ApiKey>\([^<]*\)</ApiKey>.*:\1:p')
+          test -n "$api_key"
+          docker stop lidarr-upgrade-test
+          docker rm lidarr-upgrade-test
+          start_lidarr "$VERSION"
+          curl -fsS -H "X-Api-Key: $api_key" http://127.0.0.1:8686/api/v1/system/status \
+            | python3 -c 'import json, sys; assert json.load(sys.stdin)["version"] == "4.0.0.5247"'
+          curl -fsS -H "X-Api-Key: $api_key" http://127.0.0.1:8686/api/v1/artistfilemaintenance \
+            | python3 -c 'import json, sys; assert json.load(sys.stdin) == []'
+      - name: Test search, audit, AI import, and retagging
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0.404 \
+            dotnet test src/NzbDrone.Core.Test/Lidarr.Core.Test.csproj -c Release -f net10.0 \
             -p:RuntimeIdentifiers=linux-x64 -p:SolutionDir=/src/src/ \
-            --filter 'FullyQualifiedName~IndexerSearchTests|FullyQualifiedName~VersionAuditFixture'
+            --filter 'FullyQualifiedName~IndexerSearchTests|FullyQualifiedName~MediaFiles.LibraryAudit|FullyQualifiedName~TrackImport.Identification|FullyQualifiedName~AudioTagServiceFixture'
       - name: Package and publish the image
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           archive="lidarr-ai-$VERSION-amd64.tar.gz"
           docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
-          gh release create "v$VERSION" "$archive" \
+          gh release create "v$VERSION" "$archive" --prerelease \
             --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
-            --notes-file docs/releases/ai.29.md
+            --notes-file docs/releases/4.0-ai.30.md
