@@ -8,6 +8,8 @@ namespace NzbDrone.Core.IndexerSearch
 
         public int ArtistId { get; set; }
 
+        public string AlbumType { get; set; }
+
         public override bool SendUpdatesToClient => true;
     }
 }

@@ -103,7 +103,12 @@ export function createMapStateToProps() {
       );
       const isRefreshing = isArtistRefreshing || allArtistRefreshing;
       const isSearching = isCommandExecuting(findCommand(commands, { name: commandNames.ARTIST_SEARCH, artistId: artist.id }));
-      const isSearchingUnsatisfied = isCommandExecuting(findCommand(commands, { name: commandNames.ARTIST_UNSATISFIED_SEARCH, artistId: artist.id }));
+      const isSearchingUnsatisfied = commands.some((command) =>
+        command.name === commandNames.ARTIST_UNSATISFIED_SEARCH &&
+        command.body?.artistId === artist.id &&
+        !command.body.albumType &&
+        isCommandExecuting(command)
+      );
       const isRenamingFiles = isCommandExecuting(findCommand(commands, { name: commandNames.RENAME_FILES, artistId: artist.id }));
       const isRenamingArtistCommand = findCommand(commands, { name: commandNames.RENAME_ARTIST });
       const isRenamingArtist = (

@@ -33,10 +33,18 @@ export function createMapStateToProps() {
           (command.name === commandNames.ALBUM_SEARCH && command.body?.albumIds?.some((id) => searchAlbumIds.includes(id)));
       });
 
+      const isSearchingUnsatisfied = commands.some((command) =>
+        command.name === commandNames.ARTIST_UNSATISFIED_SEARCH &&
+        command.body?.artistId === artist.id &&
+        command.body.albumType === label &&
+        isCommandExecuting(command)
+      );
+
       return {
         items: albumsByType,
         searchAlbumIds,
         isSearching,
+        isSearchingUnsatisfied,
         columns: albums.columns,
         artistMonitored: artist.monitored,
         sortKey: albums.sortKey,
@@ -53,7 +61,7 @@ function mapDispatchToProps(dispatch) {
     toggleAlbumsMonitored: (payload) => dispatch(toggleAlbumsMonitored(payload)),
     setAlbumsTableOption: (payload) => dispatch(setAlbumsTableOption(payload)),
     dispatchSetAlbumSort: (payload) => dispatch(setAlbumsSort(payload)),
-    queueAlbumSearch: (payload) => executeCommandHelper(payload, dispatch)
+    queueSearch: (payload) => executeCommandHelper(payload, dispatch)
   };
 }
 
@@ -61,8 +69,8 @@ export class ArtistDetailsSeasonConnector extends Component {
 
   constructor(props, context) {
     super(props, context);
-    this.state = { isQueueingSearch: false, searchError: false };
-    this._isQueueingSearch = false;
+    this.state = { queueingSearchName: null, searchError: false };
+    this._queueingSearchName = null;
     this._requestId = 0;
     this._isMounted = false;
   }
@@ -74,8 +82,8 @@ export class ArtistDetailsSeasonConnector extends Component {
   componentDidUpdate(prevProps) {
     if (prevProps.artistId !== this.props.artistId) {
       this._requestId++;
-      this._isQueueingSearch = false;
-      this.setState({ isQueueingSearch: false, searchError: false });
+      this._queueingSearchName = null;
+      this.setState({ queueingSearchName: null, searchError: false });
     }
   }
 
@@ -101,29 +109,49 @@ export class ArtistDetailsSeasonConnector extends Component {
     });
   };
 
-  onSearchPress = async() => {
-    const { searchAlbumIds, isSearching } = this.props;
-    if (this._isQueueingSearch || isSearching || !searchAlbumIds.length) {
+  onSearchPress = () => {
+    if (this.props.isSearching || !this.props.searchAlbumIds.length) {
       return;
     }
 
-    this._isQueueingSearch = true;
+    return this.queueSearch({
+      name: commandNames.ALBUM_SEARCH,
+      albumIds: this.props.searchAlbumIds
+    });
+  };
+
+  onSearchUnsatisfiedPress = () => {
+    const { artistId, artistMonitored, label, searchAlbumIds, isSearchingUnsatisfied } = this.props;
+    if (isSearchingUnsatisfied || !artistMonitored || !searchAlbumIds.length) {
+      return;
+    }
+
+    return this.queueSearch({
+      name: commandNames.ARTIST_UNSATISFIED_SEARCH,
+      artistId,
+      albumType: label
+    });
+  };
+
+  queueSearch = async(payload) => {
+    if (this._queueingSearchName) {
+      return;
+    }
+
+    this._queueingSearchName = payload.name;
     const requestId = ++this._requestId;
-    this.setState({ isQueueingSearch: true, searchError: false });
+    this.setState({ queueingSearchName: payload.name, searchError: false });
     try {
-      await this.props.queueAlbumSearch({
-        name: commandNames.ALBUM_SEARCH,
-        albumIds: searchAlbumIds
-      });
+      await this.props.queueSearch(payload);
     } catch {
       if (this._isMounted && requestId === this._requestId) {
         this.setState({ searchError: true });
       }
     } finally {
       if (requestId === this._requestId) {
-        this._isQueueingSearch = false;
+        this._queueingSearchName = null;
         if (this._isMounted) {
-          this.setState({ isQueueingSearch: false });
+          this.setState({ queueingSearchName: null });
         }
       }
     }
@@ -133,12 +161,17 @@ export class ArtistDetailsSeasonConnector extends Component {
   // Render
 
   render() {
+    const { queueingSearchName, searchError } = this.state;
+
     return (
       <ArtistDetailsSeason
         {...this.props}
-        isSearching={this.state.isQueueingSearch || this.props.isSearching}
-        searchError={this.state.searchError}
+        isSearching={queueingSearchName === commandNames.ALBUM_SEARCH || this.props.isSearching}
+        isSearchingUnsatisfied={queueingSearchName === commandNames.ARTIST_UNSATISFIED_SEARCH || this.props.isSearchingUnsatisfied}
+        isQueueingSearch={!!queueingSearchName}
+        searchError={searchError}
         onSearchPress={this.onSearchPress}
+        onSearchUnsatisfiedPress={this.onSearchUnsatisfiedPress}
         onSortPress={this.onSortPress}
         onTableOptionChange={this.onTableOptionChange}
         onMonitorAlbumsPress={this.onMonitorAlbumsPress}
@@ -152,9 +185,12 @@ ArtistDetailsSeasonConnector.propTypes = {
   toggleAlbumsMonitored: PropTypes.func.isRequired,
   setAlbumsTableOption: PropTypes.func.isRequired,
   dispatchSetAlbumSort: PropTypes.func.isRequired,
-  queueAlbumSearch: PropTypes.func.isRequired,
+  artistMonitored: PropTypes.bool.isRequired,
+  label: PropTypes.string.isRequired,
+  queueSearch: PropTypes.func.isRequired,
   searchAlbumIds: PropTypes.arrayOf(PropTypes.number).isRequired,
-  isSearching: PropTypes.bool.isRequired
+  isSearching: PropTypes.bool.isRequired,
+  isSearchingUnsatisfied: PropTypes.bool.isRequired
 };
 
 export default connect(createMapStateToProps, mapDispatchToProps)(ArtistDetailsSeasonConnector);

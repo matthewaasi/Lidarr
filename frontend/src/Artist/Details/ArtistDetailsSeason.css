@@ -57,6 +57,11 @@
   padding: 15px 10px;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+}
+
 .actionsMenu {
   composes: menu from '~Components/Menu/Menu.css';
 

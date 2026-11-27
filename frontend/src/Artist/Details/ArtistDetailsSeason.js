@@ -5,6 +5,7 @@ import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
+import SpinnerButton from 'Components/Link/SpinnerButton';
 import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import MonitorToggleButton from 'Components/MonitorToggleButton';
 import Table from 'Components/Table/Table';
@@ -201,8 +202,11 @@ class ArtistDetailsSeason extends Component {
       isSmallScreen,
       searchAlbumIds,
       isSearching,
+      isSearchingUnsatisfied,
+      isQueueingSearch,
       searchError,
       onSearchPress,
+      onSearchUnsatisfiedPress,
       onTableOptionChange
     } = this.props;
 
@@ -305,9 +309,20 @@ class ArtistDetailsSeason extends Component {
               title={searchTitle}
               aria-label={searchTitle}
               isSpinning={isSearching}
-              isDisabled={!searchAlbumIds.length || isSearching}
+              isDisabled={!searchAlbumIds.length || isSearching || isQueueingSearch}
               onPress={onSearchPress}
             />
+
+            <SpinnerButton
+              size={sizes.SMALL}
+              title={translate('SearchUnsatisfiedHelpText')}
+              aria-label={translate('SearchUnsatisfied')}
+              isSpinning={isSearchingUnsatisfied}
+              isDisabled={!artistMonitored || !searchAlbumIds.length || isQueueingSearch}
+              onPress={onSearchUnsatisfiedPress}
+            >
+              {translate('SearchUnsatisfied')}
+            </SpinnerButton>
           </div>
         </div>
 
@@ -393,8 +408,11 @@ ArtistDetailsSeason.propTypes = {
   isSmallScreen: PropTypes.bool.isRequired,
   searchAlbumIds: PropTypes.arrayOf(PropTypes.number).isRequired,
   isSearching: PropTypes.bool.isRequired,
+  isSearchingUnsatisfied: PropTypes.bool.isRequired,
+  isQueueingSearch: PropTypes.bool.isRequired,
   searchError: PropTypes.bool.isRequired,
   onSearchPress: PropTypes.func.isRequired,
+  onSearchUnsatisfiedPress: PropTypes.func.isRequired,
   onTableOptionChange: PropTypes.func.isRequired,
   onExpandPress: PropTypes.func.isRequired,
   onSortPress: PropTypes.func.isRequired,

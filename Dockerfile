@@ -18,7 +18,7 @@ RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj -c Release -f net1
     -p:RuntimeIdentifiers=linux-musl-x64 -p:SolutionDir=/src/src/ -p:AssemblyVersion=4.0.0.5247 -p:AssemblyConfiguration=nightly-ai -o /out
 
 FROM ghcr.io/linuxserver/lidarr:nightly-4.0.0.5247-ls230
-ARG FORK_VERSION=4.0.0.5247-ai.30
+ARG FORK_VERSION=4.0.0.5247-ai.31
 ARG VCS_REF=unknown
 RUN rm -rf /app/lidarr/bin && mkdir -p /app/lidarr/bin
 COPY --from=backend /out/ /app/lidarr/bin/

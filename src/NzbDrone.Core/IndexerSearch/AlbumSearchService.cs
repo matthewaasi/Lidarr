@@ -170,7 +170,8 @@ namespace NzbDrone.Core.IndexerSearch
             var queuedAlbumIds = _queueService.GetQueue().Where(item => item.Album != null)
                 .Select(item => item.Album.Id).ToHashSet();
             var albums = missing.Concat(cutoffUnmet).DistinctBy(album => album.Id)
-                .Where(album => !queuedAlbumIds.Contains(album.Id)).ToList();
+                .Where(album => (message.AlbumType == null || album.AlbumType == message.AlbumType) &&
+                    !queuedAlbumIds.Contains(album.Id)).ToList();
 
             SearchForBulkAlbums(albums, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
         }
