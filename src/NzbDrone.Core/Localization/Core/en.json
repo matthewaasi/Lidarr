@@ -1130,6 +1130,8 @@
   "SearchForMissing": "Search for Missing",
   "SearchForMonitoredAlbums": "Search for monitored albums",
   "SearchMonitored": "Search Monitored",
+  "SearchUnsatisfied": "Search Unsatisfied",
+  "SearchUnsatisfiedHelpText": "Search monitored releases with missing tracks or quality below cutoff",
   "RetryAi": "Retry Matching",
   "RetryAiHelpText": "Retry identification using the engine selected in Settings for all completed downloads awaiting import, including items hidden by the current filter",
   "RetryAiFailed": "Could not queue the matching retry. Please try again.",

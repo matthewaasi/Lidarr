@@ -103,6 +103,7 @@ export function createMapStateToProps() {
       );
       const isRefreshing = isArtistRefreshing || allArtistRefreshing;
       const isSearching = isCommandExecuting(findCommand(commands, { name: commandNames.ARTIST_SEARCH, artistId: artist.id }));
+      const isSearchingUnsatisfied = isCommandExecuting(findCommand(commands, { name: commandNames.ARTIST_UNSATISFIED_SEARCH, artistId: artist.id }));
       const isRenamingFiles = isCommandExecuting(findCommand(commands, { name: commandNames.RENAME_FILES, artistId: artist.id }));
       const isRenamingArtistCommand = findCommand(commands, { name: commandNames.RENAME_ARTIST });
       const isRenamingArtist = (
@@ -131,6 +132,7 @@ export function createMapStateToProps() {
         allArtistRefreshing,
         isRefreshing,
         isSearching,
+        isSearchingUnsatisfied,
         isRenamingFiles,
         isRenamingArtist,
         isFetching,
@@ -241,6 +243,13 @@ class ArtistDetailsConnector extends Component {
     });
   };
 
+  onSearchUnsatisfiedPress = () => {
+    this.props.executeCommand({
+      name: commandNames.ARTIST_UNSATISFIED_SEARCH,
+      artistId: this.props.id
+    });
+  };
+
   //
   // Render
 
@@ -251,6 +260,7 @@ class ArtistDetailsConnector extends Component {
         onMonitorTogglePress={this.onMonitorTogglePress}
         onRefreshPress={this.onRefreshPress}
         onSearchPress={this.onSearchPress}
+        onSearchUnsatisfiedPress={this.onSearchUnsatisfiedPress}
       />
     );
   }

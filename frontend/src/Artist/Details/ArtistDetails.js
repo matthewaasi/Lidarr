@@ -202,6 +202,7 @@ class ArtistDetails extends Component {
       isSaving,
       isRefreshing,
       isSearching,
+      isSearchingUnsatisfied,
       isFetching,
       isPopulated,
       albumsError,
@@ -214,6 +215,7 @@ class ArtistDetails extends Component {
       onMonitorTogglePress,
       onRefreshPress,
       onSearchPress,
+      onSearchUnsatisfiedPress,
       artistType
     } = this.props;
 
@@ -277,6 +279,15 @@ class ArtistDetails extends Component {
               isSpinning={isSearching}
               title={hasMonitoredAlbums ? undefined : translate('HasMonitoredAlbumsNoMonitoredAlbumsForThisArtist')}
               onPress={onSearchPress}
+            />
+
+            <PageToolbarButton
+              label={translate('SearchUnsatisfied')}
+              iconName={icons.SEARCH}
+              isDisabled={!monitored || !hasMonitoredAlbums || !hasAlbums}
+              isSpinning={isSearchingUnsatisfied}
+              title={translate('SearchUnsatisfiedHelpText')}
+              onPress={onSearchUnsatisfiedPress}
             />
 
             <PageToolbarButton
@@ -734,6 +745,7 @@ ArtistDetails.propTypes = {
   isSaving: PropTypes.bool.isRequired,
   isRefreshing: PropTypes.bool.isRequired,
   isSearching: PropTypes.bool.isRequired,
+  isSearchingUnsatisfied: PropTypes.bool.isRequired,
   isFetching: PropTypes.bool.isRequired,
   isPopulated: PropTypes.bool.isRequired,
   albumsError: PropTypes.object,
@@ -745,7 +757,8 @@ ArtistDetails.propTypes = {
   nextArtist: PropTypes.object.isRequired,
   onMonitorTogglePress: PropTypes.func.isRequired,
   onRefreshPress: PropTypes.func.isRequired,
-  onSearchPress: PropTypes.func.isRequired
+  onSearchPress: PropTypes.func.isRequired,
+  onSearchUnsatisfiedPress: PropTypes.func.isRequired
 };
 
 ArtistDetails.defaultProps = {

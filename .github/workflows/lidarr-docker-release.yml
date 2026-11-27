@@ -2,7 +2,7 @@ name: Lidarr Docker release
 
 on:
   push:
-    branches: ['release/ai.28']
+    branches: ['release/ai.29']
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERSION: 3.2.1.5196-ai.28
+      VERSION: 3.2.1.5196-ai.29
     steps:
       - uses: actions/checkout@v4
       - name: Build and smoke-test the Linux amd64 image
@@ -35,12 +35,12 @@ jobs:
           done
           docker logs lidarr-smoke
           exit 1
-      - name: Test duration and version audit
+      - name: Test indexer search and version audit
         run: |
           docker run --rm -v "$PWD:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0.421 \
             dotnet test src/NzbDrone.Core.Test/Lidarr.Core.Test.csproj -c Release -f net8.0 \
             -p:RuntimeIdentifiers=linux-x64 -p:SolutionDir=/src/src/ \
-            --filter FullyQualifiedName~VersionAuditFixture
+            --filter 'FullyQualifiedName~IndexerSearchTests|FullyQualifiedName~VersionAuditFixture'
       - name: Package and publish the image
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,4 +49,4 @@ jobs:
           docker save "lidarr-ai:$VERSION" | gzip -1 > "$archive"
           gh release create "v$VERSION" "$archive" \
             --target "$GITHUB_SHA" --title "Lidarr $VERSION" \
-            --notes-file docs/releases/ai.28.md
+            --notes-file docs/releases/ai.29.md

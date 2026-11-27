@@ -16,10 +16,12 @@ namespace NzbDrone.Core.IndexerSearch
 {
     internal class AlbumSearchService : IExecute<AlbumSearchCommand>,
                                IExecute<MissingAlbumSearchCommand>,
-                               IExecute<CutoffUnmetAlbumSearchCommand>
+                               IExecute<CutoffUnmetAlbumSearchCommand>,
+                               IExecute<ArtistUnsatisfiedSearchCommand>
     {
         private readonly ISearchForReleases _releaseSearchService;
         private readonly IAlbumService _albumService;
+        private readonly IArtistService _artistService;
         private readonly IAlbumCutoffService _albumCutoffService;
         private readonly IQueueService _queueService;
         private readonly IProcessDownloadDecisions _processDownloadDecisions;
@@ -27,6 +29,7 @@ namespace NzbDrone.Core.IndexerSearch
 
         public AlbumSearchService(ISearchForReleases nzbSearchService,
             IAlbumService albumService,
+            IArtistService artistService,
             IAlbumCutoffService albumCutoffService,
             IQueueService queueService,
             IProcessDownloadDecisions processDownloadDecisions,
@@ -34,6 +37,7 @@ namespace NzbDrone.Core.IndexerSearch
         {
             _releaseSearchService = nzbSearchService;
             _albumService = albumService;
+            _artistService = artistService;
             _albumCutoffService = albumCutoffService;
             _queueService = queueService;
             _processDownloadDecisions = processDownloadDecisions;
@@ -144,6 +148,31 @@ namespace NzbDrone.Core.IndexerSearch
             var cutoffUnmet = albums.Where(e => !queue.Contains(e.Id)).ToList();
 
             SearchForBulkAlbums(cutoffUnmet, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
+        }
+
+        public void Execute(ArtistUnsatisfiedSearchCommand message)
+        {
+            var pagingSpec = new PagingSpec<Album>
+            {
+                Page = 1,
+                PageSize = int.MaxValue,
+                SortDirection = SortDirection.Ascending,
+                SortKey = "Id"
+            };
+
+            message.CancellationToken.ThrowIfCancellationRequested();
+            var artistMetadataId = _artistService.GetArtist(message.ArtistId).ArtistMetadataId;
+            pagingSpec.FilterExpressions.Add(album => album.ArtistMetadataId == artistMetadataId &&
+                album.Monitored == true && album.Artist.Value.Monitored == true);
+
+            var missing = _albumService.AlbumsWithoutFiles(pagingSpec).Records;
+            var cutoffUnmet = _albumCutoffService.AlbumsWhereCutoffUnmet(pagingSpec).Records;
+            var queuedAlbumIds = _queueService.GetQueue().Where(item => item.Album != null)
+                .Select(item => item.Album.Id).ToHashSet();
+            var albums = missing.Concat(cutoffUnmet).DistinctBy(album => album.Id)
+                .Where(album => !queuedAlbumIds.Contains(album.Id)).ToList();
+
+            SearchForBulkAlbums(albums, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
         }
     }
 }
