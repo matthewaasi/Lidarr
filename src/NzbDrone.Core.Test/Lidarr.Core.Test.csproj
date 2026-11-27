@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NzbDrone.Test.Common\Lidarr.Test.Common.csproj" />
     <ProjectReference Include="..\NzbDrone.Core\Lidarr.Core.csproj" />
+    <ProjectReference Include="..\NzbDrone.Mono\Lidarr.Mono.csproj" Condition="!$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Logo\1024.png">
